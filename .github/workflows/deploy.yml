@@ -18,5 +18,13 @@ jobs:
           script: |
             cd /var/www/ti4-bag-draft
             git pull origin main
-            npm install --production
-            pm2 restart ti4-bag-draft || pm2 start index.js --name "ti4-bag-draft"
+            
+            # Установка зависимостей
+            npm install
+            npm install --prefix client
+            npm install --prefix server
+            
+            # Перезапуск PM2 с именем процесса ti4-bag-draft
+            pm2 delete ti4-bag-draft || true
+            pm2 start server/index.js --name "ti4-bag-draft"
+            pm2 save
