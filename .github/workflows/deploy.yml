@@ -24,7 +24,7 @@ jobs:
             npm install --prefix client
             npm install --prefix server
             
-            # Перезапуск PM2 с именем процесса ti4-bag-draft
-            pm2 delete ti4-bag-draft || true
-            pm2 start server/index.js --name "ti4-bag-draft"
+            # Перезапуск PM2 с именем процесса ti4_bag_draft
+            pm2 delete ti4bag_draft || true
+            pm2 start server/index.js --name "ti4_bag_draft"
             pm2 save
