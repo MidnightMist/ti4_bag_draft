@@ -54,8 +54,3 @@ export default function App() {
     </Router>
   );
 }
-        <Link to="/draft" style={buttonStyle}>Bag Draft</Link>
-      </div>
-    </div>
-  );
-}
