@@ -22,6 +22,7 @@ jobs:
             # Установка зависимостей
             npm install
             npm install --prefix client
+            npm run build --prefix client
             npm install --prefix server
             
             # Перезапуск PM2 с именем процесса ti4_bag_draft
