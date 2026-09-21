@@ -16,7 +16,7 @@ jobs:
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd /var/www/backdraft
+            cd /var/www/ti4-bag-draft
             git pull origin main
             npm install --production
-            pm2 restart backdraft || pm2 start index.js --name "backdraft"
+            pm2 restart ti4-bag-draft || pm2 start index.js --name "ti4-bag-draft"
