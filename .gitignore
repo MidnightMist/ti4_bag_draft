@@ -147,3 +147,7 @@ vite.config.ts.timestamp-*
 !.vscode/extensions.json
 !.vscode/launch.json
 !.vscode/tasks.json
+
+# Local tile graphics
+client/public/tiles/
+tiles/
