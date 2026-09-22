@@ -5,7 +5,7 @@ export default function CreateRoom({ onCancel }) {
   const navigate = useNavigate();
   const [playerCount, setPlayerCount] = useState(6);
   const [playerNames, setPlayerNames] = useState([
-    'Игрок 1', 'Игрок 2', 'Игрок 3', 'Игрок 4', 'Игрок 5', 'Игрок 6'
+    '', '', '', '', '', ''
   ]);
   const [expansions, setExpansions] = useState({
     pok: true,
@@ -28,7 +28,7 @@ export default function CreateRoom({ onCancel }) {
     setPlayerCount(count);
     const updatedNames = [...playerNames];
     while (updatedNames.length < count) {
-      updatedNames.push(`Игрок ${updatedNames.length + 1}`);
+      updatedNames.push('');
     }
     setPlayerNames(updatedNames.slice(0, count));
   };
