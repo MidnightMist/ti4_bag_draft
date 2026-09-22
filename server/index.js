@@ -182,6 +182,16 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 4000;
 
+// Serve static tile images from client/public/tiles or root /tiles
+const clientTiles = path.resolve(__dirname, '../client/public/tiles');
+if (fs.existsSync(clientTiles)) {
+  app.use('/tiles', express.static(clientTiles));
+}
+const rootTiles = path.resolve(__dirname, '../tiles');
+if (fs.existsSync(rootTiles)) {
+  app.use('/tiles', express.static(rootTiles));
+}
+
 const clientDist = path.resolve(__dirname, '../client/dist');
 if (fs.existsSync(clientDist)) {
   app.use(express.static(clientDist));

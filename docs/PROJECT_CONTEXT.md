@@ -101,3 +101,12 @@
 1. **Language:** English only. No Cyrillic in user-facing UI labels, error alerts, placeholders, or buttons.
 2. **Minimal Clutter:** Keep setup forms clean. Avoid displaying internal database IDs or verbose tile number ranges directly in high-level configuration options.
 3. **Real-time Synchronization:** Maintain Socket.IO state on server (`server/index.js`), with reactive client updates in React.
+
+---
+
+## 5. Tile Image Assets Architecture
+- **Location:** `client/public/tiles/` (and mirrored to `client/dist/tiles/` on build).
+- **Git Tracking:** Explicitly ignored in `.gitignore` (`client/public/tiles/`, `tiles/`) so binary image assets are never committed to GitHub.
+- **Naming Convention:** `ST_{tileId}.png` (e.g. `ST_18.png` for Mecatol Rex, `ST_1.png` for Jord / Sol, etc.).
+- **Server Route:** Express explicitly exposes `/tiles` via `express.static(path.resolve(__dirname, '../client/public/tiles'))`.
+- **UI Rendering & Fallback:** `HexTile` SVG component clips image via `<clipPath id="hex-clip-shape">`, applies crisp outline stroke overlay, and automatically falls back to vector polygon + text label if an image fails to load or is not present.
