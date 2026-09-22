@@ -1,0 +1,6 @@
+{
+  "name": "TI4 Bag Draft & Map Builder",
+  "description": "Twilight Imperium 4 Bag Draft and Map Builder",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
