@@ -24,7 +24,7 @@ export default function CreateRoom({ onCancel }) {
   const [tierError, setTierError] = useState(null);
   const [showTierConfig, setShowTierConfig] = useState(false);
 
-  // Balance tier defaults (синие тайлы выбранных дополнений по тирам)
+  // Balance tier defaults (blue tiles of active expansions by tier)
   const initialDefaultTiers = getDefaultTiersForExpansions({ pok: true, thundersEdge: false });
   const [tiers, setTiers] = useState({
     tier1: initialDefaultTiers.tier1.join(', '),
@@ -46,7 +46,7 @@ export default function CreateRoom({ onCancel }) {
     const updatedExpansions = { ...expansions, [expKey]: isChecked };
     setExpansions(updatedExpansions);
 
-    // При смене дополнений обновляем дефолтные тиры тайлов
+    // Update default tiers when expansions change
     const updatedDefaultTiers = getDefaultTiersForExpansions(updatedExpansions);
     setTiers({
       tier1: updatedDefaultTiers.tier1.join(', '),
@@ -77,14 +77,14 @@ export default function CreateRoom({ onCancel }) {
     setError(null);
     setTierError(null);
 
-    // Валидация тиров синих тайлов в сбалансированном режиме с учетом выбранных дополнений
+    // Validate blue tile tiers in balanced mode
     let parsedTiers = null;
     if (tileMode === 'balanced') {
       const validation = validateBlueTiers(tiers, expansions);
       if (!validation.isValid) {
         setTierError(validation.error);
         setError(validation.error);
-        setShowTierConfig(true); // Автоматически раскрываем блок с ошибкой
+        setShowTierConfig(true); // Open config box on error
         setIsSubmitting(false);
         return;
       }
@@ -112,7 +112,7 @@ export default function CreateRoom({ onCancel }) {
 
       if (!res.ok) {
         const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Не удалось создать комнату');
+        throw new Error(errorData.error || 'Failed to create room');
       }
 
       const data = await res.json();
@@ -121,7 +121,7 @@ export default function CreateRoom({ onCancel }) {
       }
     } catch (err) {
       console.error(err);
-      setError(err.message || 'Ошибка соединения с сервером');
+      setError(err.message || 'Server connection error');
     } finally {
       setIsSubmitting(false);
     }
@@ -130,7 +130,7 @@ export default function CreateRoom({ onCancel }) {
   return (
     <div id="create-room-container" style={containerStyle}>
       <h2 style={{ marginTop: 0, marginBottom: '24px', fontSize: '24px', color: '#f3f4f6' }}>
-        Настройки комнаты: Random Map Creation
+        Room Setup: Random Map Creation
       </h2>
 
       {error && (
@@ -139,10 +139,10 @@ export default function CreateRoom({ onCancel }) {
         </div>
       )}
 
-      {/* Количество игроков */}
+      {/* Player count */}
       <div style={sectionStyle}>
         <label style={labelStyle}>
-          Количество игроков:
+          Number of Players:
           <span style={{ marginLeft: '10px', fontWeight: 'bold', color: '#60a5fa' }}>{playerCount}</span>
         </label>
         <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
@@ -165,29 +165,29 @@ export default function CreateRoom({ onCancel }) {
         </div>
       </div>
 
-      {/* Имена игроков */}
+      {/* Player names */}
       <div style={sectionStyle}>
-        <label style={labelStyle}>Имена игроков:</label>
+        <label style={labelStyle}>Player Names:</label>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginTop: '8px' }}>
           {playerNames.slice(0, playerCount).map((name, idx) => (
             <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '13px', color: '#9ca3af' }}>Слот {idx + 1}</span>
+              <span style={{ fontSize: '13px', color: '#9ca3af' }}>Slot {idx + 1}</span>
               <input
                 id={`player-name-input-${idx}`}
                 type="text"
                 value={name}
                 onChange={(e) => handleNameChange(idx, e.target.value)}
                 style={inputStyle}
-                placeholder={`Игрок ${idx + 1}`}
+                placeholder={`Player ${idx + 1}`}
               />
             </div>
           ))}
         </div>
       </div>
 
-      {/* Дополнения */}
+      {/* Expansions */}
       <div style={sectionStyle}>
-        <label style={labelStyle}>Дополнения:</label>
+        <label style={labelStyle}>Expansions:</label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
           <label style={checkboxLabelStyle}>
             <input
@@ -212,9 +212,9 @@ export default function CreateRoom({ onCancel }) {
         </div>
       </div>
 
-      {/* Режим тайлов */}
+      {/* Tile distribution mode */}
       <div style={sectionStyle}>
-        <label style={labelStyle}>Режим распределения тайлов:</label>
+        <label style={labelStyle}>Tile Distribution Mode:</label>
         <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
           <label style={radioLabelStyle}>
             <input
@@ -225,7 +225,7 @@ export default function CreateRoom({ onCancel }) {
               checked={tileMode === 'balanced'}
               onChange={() => setTileMode('balanced')}
             />
-            <span>Сбалансированные тайлы (3 тира)</span>
+            <span>Balanced Tiles (3 Tiers)</span>
           </label>
           <label style={radioLabelStyle}>
             <input
@@ -236,16 +236,16 @@ export default function CreateRoom({ onCancel }) {
               checked={tileMode === 'random'}
               onChange={() => setTileMode('random')}
             />
-            <span>Случайные тайлы</span>
+            <span>Random Tiles</span>
           </label>
         </div>
       </div>
 
-      {/* Настройка баланса (3 тира) */}
+      {/* Tier configuration */}
       {tileMode === 'balanced' && (
         <div style={sectionStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={labelStyle}>Настройка баланса тайлов:</label>
+            <label style={labelStyle}>Tile Balance Configuration:</label>
             <button
               id="toggle-balance-tiers-btn"
               type="button"
@@ -260,7 +260,7 @@ export default function CreateRoom({ onCancel }) {
                 fontSize: '14px',
               }}
             >
-              {showTierConfig ? 'Скрыть разбивку по тирам' : 'Настроить разделение на 3 тира'}
+              {showTierConfig ? 'Hide Tier Breakdown' : 'Customize 3 Tiers'}
             </button>
           </div>
 
@@ -268,7 +268,7 @@ export default function CreateRoom({ onCancel }) {
             <div style={tierModalContentStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <p style={{ margin: 0, fontSize: '14px', color: '#9ca3af' }}>
-                  Укажите номера тайлов через запятую для каждого из трех тиров:
+                  Enter tile numbers separated by commas for each of the three tiers:
                 </p>
                 <button
                   id="reset-default-tiers-btn"
@@ -284,9 +284,9 @@ export default function CreateRoom({ onCancel }) {
                     fontSize: '12px',
                     whiteSpace: 'nowrap'
                   }}
-                  title="Восстановить распределение по умолчанию для выбранных дополнений"
+                  title="Reset to default distribution for selected expansions"
                 >
-                  Сбросить к дефолту
+                  Reset to Default
                 </button>
               </div>
 
@@ -304,13 +304,13 @@ export default function CreateRoom({ onCancel }) {
                     border: '1px solid #ef4444'
                   }}
                 >
-                  ⚠️ <strong>Ошибка в распределении тайлов:</strong> {tierError}
+                  ⚠️ <strong>Tile Distribution Error:</strong> {tierError}
                 </div>
               )}
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div>
-                  <span style={{ fontSize: '13px', color: '#93c5fd', fontWeight: 600 }}>Тир 1 (Высокий):</span>
+                  <span style={{ fontSize: '13px', color: '#93c5fd', fontWeight: 600 }}>Tier 1 (High):</span>
                   <input
                     id="tier1-input"
                     type="text"
@@ -320,11 +320,11 @@ export default function CreateRoom({ onCancel }) {
                       if (tierError) setTierError(null);
                     }}
                     style={{ ...inputStyle, width: '100%', marginTop: '4px' }}
-                    placeholder="Например: 27, 28, 29, 30..."
+                    placeholder="e.g. 27, 28, 29, 30..."
                   />
                 </div>
                 <div>
-                  <span style={{ fontSize: '13px', color: '#93c5fd', fontWeight: 600 }}>Тир 2 (Средний):</span>
+                  <span style={{ fontSize: '13px', color: '#93c5fd', fontWeight: 600 }}>Tier 2 (Medium):</span>
                   <input
                     id="tier2-input"
                     type="text"
@@ -334,11 +334,11 @@ export default function CreateRoom({ onCancel }) {
                       if (tierError) setTierError(null);
                     }}
                     style={{ ...inputStyle, width: '100%', marginTop: '4px' }}
-                    placeholder="Например: 26, 31, 33, 34..."
+                    placeholder="e.g. 26, 31, 33, 34..."
                   />
                 </div>
                 <div>
-                  <span style={{ fontSize: '13px', color: '#93c5fd', fontWeight: 600 }}>Тир 3 (Базовый):</span>
+                  <span style={{ fontSize: '13px', color: '#93c5fd', fontWeight: 600 }}>Tier 3 (Base):</span>
                   <input
                     id="tier3-input"
                     type="text"
@@ -348,7 +348,7 @@ export default function CreateRoom({ onCancel }) {
                       if (tierError) setTierError(null);
                     }}
                     style={{ ...inputStyle, width: '100%', marginTop: '4px' }}
-                    placeholder="Например: 19, 20, 21, 22..."
+                    placeholder="e.g. 19, 20, 21, 22..."
                   />
                 </div>
               </div>
@@ -357,7 +357,7 @@ export default function CreateRoom({ onCancel }) {
         </div>
       )}
 
-      {/* Кнопка создания */}
+      {/* Action buttons */}
       <div style={{ display: 'flex', gap: '16px', marginTop: '32px' }}>
         <button
           id="submit-create-room-btn"
@@ -366,7 +366,7 @@ export default function CreateRoom({ onCancel }) {
           disabled={isSubmitting}
           style={primaryBtnStyle}
         >
-          {isSubmitting ? 'Создание...' : 'Создать комнату'}
+          {isSubmitting ? 'Creating Room...' : 'Create Room'}
         </button>
 
         {onCancel && (
@@ -376,7 +376,7 @@ export default function CreateRoom({ onCancel }) {
             onClick={onCancel}
             style={secondaryBtnStyle}
           >
-            Отмена
+            Cancel
           </button>
         )}
       </div>

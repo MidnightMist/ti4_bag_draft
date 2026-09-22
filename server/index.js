@@ -42,7 +42,7 @@ app.post('/api/rooms', (req, res) => {
   const count = Math.min(Math.max(parseInt(playerCount, 10) || 6, 3), 8);
   const formattedPlayers = [];
   for (let i = 0; i < count; i++) {
-    const defaultName = `Игрок ${i + 1}`;
+    const defaultName = `Player ${i + 1}`;
     const name = (playerNames[i] && playerNames[i].trim()) ? playerNames[i].trim() : defaultName;
     formattedPlayers.push({
       slotId: i,
@@ -103,7 +103,7 @@ io.on('connection', (socket) => {
   socket.on('join_room', ({ roomId, userId }) => {
     const room = rooms.get(roomId);
     if (!room) {
-      socket.emit('room_error', { message: 'Комната не найдена' });
+      socket.emit('room_error', { message: 'Room not found' });
       return;
     }
 
@@ -118,7 +118,7 @@ io.on('connection', (socket) => {
   socket.on('claim_slot', ({ roomId, slotId, userId }) => {
     const room = rooms.get(roomId);
     if (!room) {
-      socket.emit('room_error', { message: 'Комната не найдена' });
+      socket.emit('room_error', { message: 'Room not found' });
       return;
     }
 
@@ -132,12 +132,12 @@ io.on('connection', (socket) => {
 
     const targetSlot = room.players.find(p => p.slotId === slotId);
     if (!targetSlot) {
-      socket.emit('room_error', { message: 'Слот не найден' });
+      socket.emit('room_error', { message: 'Slot not found' });
       return;
     }
 
     if (targetSlot.claimedBy && targetSlot.claimedBy !== userId) {
-      socket.emit('room_error', { message: 'Этот слот уже занят другим игроком' });
+      socket.emit('room_error', { message: 'This slot is already claimed by another player' });
       return;
     }
 

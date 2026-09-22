@@ -1,7 +1,7 @@
 import { getActiveBlueTiles } from './blueTiles.js';
 
 /**
- * Валидирует распределение синих тайлов по тирам с учетом активных дополнений.
+ * Validates blue tile distribution across 3 tiers considering active expansions.
  * @param {{ tier1: string | number[], tier2: string | number[], tier3: string | number[] }} rawTiers
  * @param {{ pok?: boolean, thundersEdge?: boolean }} expansions
  * @returns {{ isValid: boolean, error?: string, parsed?: { tier1: number[], tier2: number[], tier3: number[] } }}
@@ -28,7 +28,7 @@ export function validateBlueTiers(rawTiers, expansions = { pok: true, thundersEd
       return { numbers, invalidTokens };
     }
     if (typeof tierValue !== 'string') {
-      return { numbers: [], invalidTokens: ['некорректное значение'] };
+      return { numbers: [], invalidTokens: ['invalid value'] };
     }
 
     const tokens = tierValue.split(/[\s,]+/).map(t => t.trim()).filter(Boolean);
@@ -46,49 +46,49 @@ export function validateBlueTiers(rawTiers, expansions = { pok: true, thundersEd
     return { numbers, invalidTokens };
   };
 
-  const parsed1 = parseTier(rawTiers.tier1, 'Тир 1');
-  const parsed2 = parseTier(rawTiers.tier2, 'Тир 2');
-  const parsed3 = parseTier(rawTiers.tier3, 'Тир 3');
+  const parsed1 = parseTier(rawTiers.tier1, 'Tier 1');
+  const parsed2 = parseTier(rawTiers.tier2, 'Tier 2');
+  const parsed3 = parseTier(rawTiers.tier3, 'Tier 3');
 
-  // 1. Проверка на нечисловые/некорректные значения
+  // 1. Check for non-numeric/invalid tokens
   if (parsed1.invalidTokens.length > 0) {
     return {
       isValid: false,
-      error: `В строке «Тир 1» обнаружены некорректные значения: ${parsed1.invalidTokens.join(', ')}`
+      error: `Invalid values found in "Tier 1": ${parsed1.invalidTokens.join(', ')}`
     };
   }
   if (parsed2.invalidTokens.length > 0) {
     return {
       isValid: false,
-      error: `В строке «Тир 2» обнаружены некорректные значения: ${parsed2.invalidTokens.join(', ')}`
+      error: `Invalid values found in "Tier 2": ${parsed2.invalidTokens.join(', ')}`
     };
   }
   if (parsed3.invalidTokens.length > 0) {
     return {
       isValid: false,
-      error: `В строке «Тир 3» обнаружены некорректные значения: ${parsed3.invalidTokens.join(', ')}`
+      error: `Invalid values found in "Tier 3": ${parsed3.invalidTokens.join(', ')}`
     };
   }
 
-  // 2. Проверка, что используются только номера синих тайлов из активных дополнений
+  // 2. Check that tiles belong to active blue tiles
   const checkUnknown = (nums, tierLabel) => {
     const unknown = nums.filter(num => !activeBlueSet.has(num));
     if (unknown.length > 0) {
-      return `В строке «${tierLabel}» указаны тайлы, не входящие в синие тайлы выбранных дополнений: ${unknown.join(', ')}`;
+      return `"${tierLabel}" contains tiles that are not blue tiles in the selected expansions: ${unknown.join(', ')}`;
     }
     return null;
   };
 
-  const unknownErr1 = checkUnknown(parsed1.numbers, 'Тир 1');
+  const unknownErr1 = checkUnknown(parsed1.numbers, 'Tier 1');
   if (unknownErr1) return { isValid: false, error: unknownErr1 };
 
-  const unknownErr2 = checkUnknown(parsed2.numbers, 'Тир 2');
+  const unknownErr2 = checkUnknown(parsed2.numbers, 'Tier 2');
   if (unknownErr2) return { isValid: false, error: unknownErr2 };
 
-  const unknownErr3 = checkUnknown(parsed3.numbers, 'Тир 3');
+  const unknownErr3 = checkUnknown(parsed3.numbers, 'Tier 3');
   if (unknownErr3) return { isValid: false, error: unknownErr3 };
 
-  // 3. Проверка на дубликаты внутри одной строки
+  // 3. Check for duplicates within each tier row
   const findDuplicatesWithin = (nums, tierLabel) => {
     const seen = new Set();
     const duplicates = new Set();
@@ -100,21 +100,21 @@ export function validateBlueTiers(rawTiers, expansions = { pok: true, thundersEd
       }
     }
     if (duplicates.size > 0) {
-      return `В строке «${tierLabel}» есть повторяющиеся тайлы: ${Array.from(duplicates).join(', ')}`;
+      return `Duplicate tiles found in "${tierLabel}": ${Array.from(duplicates).join(', ')}`;
     }
     return null;
   };
 
-  const dupWithin1 = findDuplicatesWithin(parsed1.numbers, 'Тир 1');
+  const dupWithin1 = findDuplicatesWithin(parsed1.numbers, 'Tier 1');
   if (dupWithin1) return { isValid: false, error: dupWithin1 };
 
-  const dupWithin2 = findDuplicatesWithin(parsed2.numbers, 'Тир 2');
+  const dupWithin2 = findDuplicatesWithin(parsed2.numbers, 'Tier 2');
   if (dupWithin2) return { isValid: false, error: dupWithin2 };
 
-  const dupWithin3 = findDuplicatesWithin(parsed3.numbers, 'Тир 3');
+  const dupWithin3 = findDuplicatesWithin(parsed3.numbers, 'Tier 3');
   if (dupWithin3) return { isValid: false, error: dupWithin3 };
 
-  // 4. Проверка на пересечения (дубликаты) между строками
+  // 4. Check for overlaps between tiers
   const set1 = new Set(parsed1.numbers);
   const set2 = new Set(parsed2.numbers);
   const set3 = new Set(parsed3.numbers);
@@ -123,7 +123,7 @@ export function validateBlueTiers(rawTiers, expansions = { pok: true, thundersEd
   if (overlap12.length > 0) {
     return {
       isValid: false,
-      error: `Тайлы повторяются между «Тир 1» и «Тир 2»: ${Array.from(new Set(overlap12)).join(', ')}`
+      error: `Tiles overlap between "Tier 1" and "Tier 2": ${Array.from(new Set(overlap12)).join(', ')}`
     };
   }
 
@@ -131,7 +131,7 @@ export function validateBlueTiers(rawTiers, expansions = { pok: true, thundersEd
   if (overlap13.length > 0) {
     return {
       isValid: false,
-      error: `Тайлы повторяются между «Тир 1» и «Тир 3»: ${Array.from(new Set(overlap13)).join(', ')}`
+      error: `Tiles overlap between "Tier 1" and "Tier 3": ${Array.from(new Set(overlap13)).join(', ')}`
     };
   }
 
@@ -139,18 +139,18 @@ export function validateBlueTiers(rawTiers, expansions = { pok: true, thundersEd
   if (overlap23.length > 0) {
     return {
       isValid: false,
-      error: `Тайлы повторяются между «Тир 2» и «Тир 3»: ${Array.from(new Set(overlap23)).join(', ')}`
+      error: `Tiles overlap between "Tier 2" and "Tier 3": ${Array.from(new Set(overlap23)).join(', ')}`
     };
   }
 
-  // 5. Проверка, что ВСЕ синие тайлы активных дополнений указаны в строчках
+  // 5. Check that ALL blue tiles of active expansions are assigned
   const allSpecified = new Set([...parsed1.numbers, ...parsed2.numbers, ...parsed3.numbers]);
   const missingTiles = activeBlueList.filter(tileId => !allSpecified.has(tileId));
 
   if (missingTiles.length > 0) {
     return {
       isValid: false,
-      error: `Не все синие тайлы распределены! Пропущено тайлов (${missingTiles.length} из ${activeBlueList.length}): ${missingTiles.join(', ')}`
+      error: `Not all blue tiles are assigned! Missing tiles (${missingTiles.length} of ${activeBlueList.length}): ${missingTiles.join(', ')}`
     };
   }
 

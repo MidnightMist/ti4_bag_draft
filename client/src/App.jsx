@@ -11,7 +11,7 @@ function Home() {
         Twilight Imperium 4
       </h1>
       <p style={{ color: '#9ca3af', marginBottom: '40px', fontSize: '16px' }}>
-        Инструменты создания карты и драфта
+        Map Generator and Bag Draft Tools
       </p>
 
       <div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -54,7 +54,7 @@ function PageLayout({ title, children }) {
           onMouseEnter={(e) => e.target.style.backgroundColor = '#374151'}
           onMouseLeave={(e) => e.target.style.backgroundColor = '#1f2937'}
         >
-          ← На главную
+          ← Home
         </button>
       </div>
       {children}
@@ -95,7 +95,7 @@ export default function App() {
         <Route 
           path="/map" 
           element={
-            <PageLayout title="Random Map Creation — Настройка">
+            <PageLayout title="Random Map Creation — Setup">
               <CreateRoom />
             </PageLayout>
           } 

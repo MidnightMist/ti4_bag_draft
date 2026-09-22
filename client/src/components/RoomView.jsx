@@ -20,7 +20,7 @@ export default function RoomView() {
     // 1. Initial REST fetch for fast load
     fetch(`/api/rooms/${roomId}`)
       .then((res) => {
-        if (!res.ok) throw new Error('Комната не найдена');
+        if (!res.ok) throw new Error('Room not found');
         return res.json();
       })
       .then((data) => {
@@ -73,14 +73,14 @@ export default function RoomView() {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }).catch(() => {
-      prompt('Скопируйте ссылку на комнату:', url);
+      prompt('Copy room link:', url);
     });
   };
 
   if (loading) {
     return (
       <div id="room-loading" style={{ textAlign: 'center', padding: '60px', color: '#9ca3af' }}>
-        Загрузка данных комнаты...
+        Loading room data...
       </div>
     );
   }
@@ -88,7 +88,7 @@ export default function RoomView() {
   if (error || !room) {
     return (
       <div id="room-error" style={{ textAlign: 'center', padding: '40px' }}>
-        <h3 style={{ color: '#ef4444' }}>{error || 'Комната не найдена'}</h3>
+        <h3 style={{ color: '#ef4444' }}>{error || 'Room not found'}</h3>
         <button
           onClick={() => navigate('/')}
           style={{
@@ -101,7 +101,7 @@ export default function RoomView() {
             cursor: 'pointer'
           }}
         >
-          На главную
+          Back to Home
         </button>
       </div>
     );
@@ -119,7 +119,7 @@ export default function RoomView() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <span style={{ fontSize: '13px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Комната создания карты
+              Map Creation Room
             </span>
             <h2 style={{ margin: '4px 0 0 0', fontSize: '22px', color: '#f9fafb' }}>
               ID: <span style={{ color: '#60a5fa', fontFamily: 'monospace' }}>{room.id}</span>
@@ -145,16 +145,16 @@ export default function RoomView() {
                 transition: 'background-color 0.2s',
               }}
             >
-              {copied ? '✓ Ссылка скопирована!' : '🔗 Скопировать ссылку для игроков'}
+              {copied ? '✓ Link Copied!' : '🔗 Copy Link for Players'}
             </button>
           </div>
         </div>
 
         {/* Room configuration info chips */}
         <div style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
-          <span style={chipStyle}>👥 Игроков: {totalSlots}</span>
+          <span style={chipStyle}>👥 Players: {totalSlots}</span>
           <span style={chipStyle}>
-            {room.settings.tileMode === 'balanced' ? '⚖️ Сбалансированные тайлы' : '🎲 Случайные тайлы'}
+            {room.settings.tileMode === 'balanced' ? '⚖️ Balanced Tiles' : '🎲 Random Tiles'}
           </span>
           {room.settings.expansions.pok && <span style={chipStyle}>📦 PoK</span>}
           {room.settings.expansions.thundersEdge && <span style={chipStyle}>⚡ Thunder's Edge</span>}
@@ -163,7 +163,7 @@ export default function RoomView() {
             backgroundColor: isLobby ? '#374151' : '#065f46',
             color: isLobby ? '#f3f4f6' : '#6ee7b7'
           }}>
-            {isLobby ? `⏳ Ожидание Claim (${claimedCount}/${totalSlots})` : '🚀 Поле готово к генерации'}
+            {isLobby ? `⏳ Waiting for Claims (${claimedCount}/${totalSlots})` : '🚀 Board ready to build'}
           </span>
         </div>
       </div>
@@ -173,10 +173,10 @@ export default function RoomView() {
         <div id="lobby-claim-section" style={{ marginTop: '24px' }}>
           <div style={{ textAlign: 'center', marginBottom: '24px' }}>
             <h3 style={{ fontSize: '20px', color: '#f3f4f6', margin: '0 0 8px 0' }}>
-              Выберите и зарезервируйте своё имя (Claim)
+              Claim your Player Slot
             </h3>
             <p style={{ margin: 0, color: '#9ca3af', fontSize: '15px' }}>
-              Каждый игрок должен открыть эту страницу на своем устройстве и нажать <strong>Claim</strong> напротив своего имени.
+              Each player should open this page on their device and click <strong>Claim</strong> next to their name.
             </p>
           </div>
 
@@ -212,21 +212,21 @@ export default function RoomView() {
                   <div>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '12px', color: '#9ca3af', fontWeight: 'bold' }}>
-                        СЛОТ {slot.slotId + 1}
+                        SLOT {slot.slotId + 1}
                       </span>
                       {isClaimedByMe && (
                         <span style={{ fontSize: '12px', backgroundColor: '#2563eb', padding: '2px 8px', borderRadius: '12px', color: '#fff' }}>
-                          Вы
+                          You
                         </span>
                       )}
                       {isClaimedByOther && (
                         <span style={{ fontSize: '12px', backgroundColor: '#374151', padding: '2px 8px', borderRadius: '12px', color: '#9ca3af' }}>
-                          Занят
+                          Claimed
                         </span>
                       )}
                       {isFree && (
                         <span style={{ fontSize: '12px', backgroundColor: '#064e3b', padding: '2px 8px', borderRadius: '12px', color: '#34d399' }}>
-                          Свободен
+                          Available
                         </span>
                       )}
                     </div>
@@ -242,7 +242,7 @@ export default function RoomView() {
                         onClick={() => handleUnclaim(slot.slotId)}
                         style={unclaimBtnStyle}
                       >
-                        Освободить (Unclaim)
+                        Release (Unclaim)
                       </button>
                     ) : isFree ? (
                       <button
@@ -250,14 +250,14 @@ export default function RoomView() {
                         onClick={() => handleClaim(slot.slotId)}
                         style={claimBtnStyle}
                       >
-                        Claim это имя
+                        Claim this slot
                       </button>
                     ) : (
                       <button
                         disabled
                         style={claimedDisabledBtnStyle}
                       >
-                        Занято другим игроком
+                        Claimed by another player
                       </button>
                     )}
                   </div>
@@ -267,7 +267,7 @@ export default function RoomView() {
           </div>
 
           <div style={{ textAlign: 'center', marginTop: '32px', color: '#6b7280', fontSize: '14px' }}>
-            Как только все {totalSlots} игроков выберут свои имена, лобби автоматически перейдет к созданию карты.
+            Once all {totalSlots} players have claimed their slots, the room will automatically advance to map creation.
           </div>
         </div>
       ) : (
@@ -286,15 +286,14 @@ export default function RoomView() {
             gap: '12px'
           }}>
             <div>
-              <strong style={{ color: '#6ee7b7', fontSize: '16px' }}>Все игроки подтвердили свои имена!</strong>
+              <strong style={{ color: '#6ee7b7', fontSize: '16px' }}>All players have claimed their slots!</strong>
               <div style={{ color: '#d1fae5', fontSize: '14px', marginTop: '2px' }}>
-                Спикером случайно выбран: <strong style={{ color: '#fff' }}>{room.players.find(p => p.isSpeaker)?.name || 'Игрок'}</strong>.
-                {myClaimedSlot && ` Вы играете за: ${myClaimedSlot.name}`}
+                Speaker randomly selected: <strong style={{ color: '#fff' }}>{room.players.find(p => p.isSpeaker)?.name || 'Player'}</strong>.
+                {myClaimedSlot && ` You are playing as: ${myClaimedSlot.name}`}
               </div>
             </div>
             <button
               onClick={() => {
-                // allow going back to claim if needed
                 if (myClaimedSlot) handleUnclaim(myClaimedSlot.slotId);
               }}
               style={{
@@ -307,11 +306,11 @@ export default function RoomView() {
                 fontSize: '13px'
               }}
             >
-              Сбросить Claim
+              Reset Claim
             </button>
           </div>
 
-          {/* Grid placeholder ready for Stage 2 & 3 */}
+          {/* Grid view */}
           <MapGrid room={room} mySlot={myClaimedSlot} />
         </div>
       )}

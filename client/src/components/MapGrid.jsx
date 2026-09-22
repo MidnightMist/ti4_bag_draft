@@ -4,10 +4,10 @@ export default function MapGrid({ room, mySlot }) {
   return (
     <div id="map-grid-container" style={{ border: '1px solid #33334d', borderRadius: '12px', padding: '24px', backgroundColor: '#1e1e2d', textAlign: 'center' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-        <h3 style={{ margin: 0, color: '#f3f4f6' }}>Игровое поле (Hex Grid)</h3>
+        <h3 style={{ margin: 0, color: '#f3f4f6' }}>Game Board (Hex Grid)</h3>
         {room && (
           <span style={{ fontSize: '13px', color: '#9ca3af' }}>
-            Этап 2: Визуализация поля и тайлов (в разработке)
+            Stage 2: Board & Tile Placement
           </span>
         )}
       </div>
@@ -18,7 +18,7 @@ export default function MapGrid({ room, mySlot }) {
           <polygon points="0,-45 38.97,-22.5 38.97,22.5 0,45 -38.97,22.5 -38.97,-22.5" fill="#3b2d54" stroke="#a78bfa" strokeWidth="2" />
           <text x="0" y="5" textAnchor="middle" fill="#fff" fontSize="13" fontWeight="bold">Mecatol Rex (18)</text>
 
-          {/* Placeholder for Ring 1 surrounding hexes */}
+          {/* Ring 1 surrounding hexes */}
           {[0, 60, 120, 180, 240, 300].map((angle, i) => {
             const rad = (angle * Math.PI) / 180;
             const dist = 78;
@@ -27,7 +27,7 @@ export default function MapGrid({ room, mySlot }) {
             return (
               <g key={i} transform={`translate(${cx}, ${cy})`}>
                 <polygon points="0,-45 38.97,-22.5 38.97,22.5 0,45 -38.97,22.5 -38.97,-22.5" fill="#181825" stroke="#3b3b54" strokeWidth="1.5" strokeDasharray="3 3" />
-                <text x="0" y="4" textAnchor="middle" fill="#6b7280" fontSize="11">Кольцо 1</text>
+                <text x="0" y="4" textAnchor="middle" fill="#6b7280" fontSize="11">Ring 1</text>
               </g>
             );
           })}
@@ -51,7 +51,7 @@ export default function MapGrid({ room, mySlot }) {
               {p.isSpeaker && '👑 '}
               <strong>{p.name}</strong>
               <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '2px' }}>
-                3 синих / 2 красных
+                3 Blue / 2 Red
               </div>
             </div>
           ))}
