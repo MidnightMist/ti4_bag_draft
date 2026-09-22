@@ -8,10 +8,16 @@
     "server"
   ],
   "scripts": {
-    "dev": "npm run build:client && node server/index.js",
+    "dev": "npm run build:client && PORT=3000 node server/index.js",
+    "dev:client": "npm --prefix client run dev",
+    "dev:server": "npm --prefix server run dev",
+    "dev:local": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "build:client": "npm --prefix client run build",
     "build": "npm run build:client",
     "lint": "echo \"No linter configured\"",
     "start": "node server/index.js"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }
