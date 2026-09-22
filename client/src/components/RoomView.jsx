@@ -1,19 +1,25 @@
-import React, { useEffect, useState, useMemo } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import { getOrCreateUserId } from '../utils/userId.js';
+import { getOrCreateUserId, setActiveUserOverride } from '../utils/userId.js';
 import MapGrid from './MapGrid.jsx';
+import DevToolbar from './DevToolbar.jsx';
 
 export default function RoomView() {
   const { roomId } = useParams();
   const navigate = useNavigate();
-  const userId = useMemo(() => getOrCreateUserId(), []);
+  const [userId, setUserId] = useState(() => getOrCreateUserId());
 
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [socket, setSocket] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  const handleSwitchUser = (newUserId) => {
+    setActiveUserOverride(newUserId);
+    setUserId(newUserId);
+  };
 
   // Initialize socket and load room
   useEffect(() => {
@@ -121,6 +127,14 @@ export default function RoomView() {
 
   return (
     <div id="room-page" style={roomContainerStyle}>
+      {/* Dev Debugging Toolbar */}
+      <DevToolbar
+        room={room}
+        currentUserId={userId}
+        onSwitchUser={handleSwitchUser}
+        socket={socket}
+      />
+
       {/* Top Banner with share link and status */}
       <div style={headerCardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>

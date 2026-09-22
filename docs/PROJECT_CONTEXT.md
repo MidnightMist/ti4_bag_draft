@@ -52,6 +52,14 @@
   - Speaker is randomly selected from claimed players.
   - Player seating arrangement around the table is assigned.
 
+### Phase 2.1: Developer & Testing Toolbar (`DevToolbar.jsx`)
+- **Single-Seat Quick Testing:**
+  - **⚡ Auto-Fill Lobby & Start Draft:** Emits `dev_autofill_room` to immediately assign all unassigned seats with mock players and advance the room to `map_building` (or next phase) with speaker selection.
+  - **🔄 Reset Room to Lobby:** Emits `dev_reset_room` to wipe claims and restore `lobby` status for clean re-runs.
+  - **Seat Switcher (Control As...):** Switches the active user session in the current tab between Player 1..N on the fly, allowing full testing of turn order and placement rules from one window.
+- **Multi-Tab Isolation:**
+  - Users can append `?user=<id>` to the room URL (e.g. `/room/:roomId?user=p2`) or click the "+ Tab Player N" shortcut to open separate isolated player sessions without needing incognito windows.
+
 ### Phase 3: Tile Dealing & Map Building (Next Implementation Step)
 1. **Player Hands:**
    - Each player receives **3 Blue tiles** and **2 Red tiles**.
@@ -148,4 +156,37 @@
 - **Reverse Proxy Requirement (Nginx/Caddy on VPS):**
   - If Nginx sits in front, it must forward `/api/` and `/socket.io/` (with WebSocket upgrade headers `Upgrade` and `Connection "upgrade"`) to `http://127.0.0.1:4000` (or whatever `PORT` is configured in PM2).
   - Alternatively, Nginx can proxy all requests (`location /`) to `http://127.0.0.1:4000` since Express handles both static frontend and API/WebSocket routes directly.
+- **Production Nginx Config Template:**
+  ```nginx
+  server {
+      listen 80;
+      server_name _;
+
+      location / {
+          root /var/www/ti4_bag_draft/client/dist;
+          index index.html;
+          try_files $uri $uri/ /index.html;
+      }
+
+      location /api/ {
+          proxy_pass http://127.0.0.1:4000;
+          proxy_http_version 1.1;
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+      }
+
+      location /socket.io/ {
+          proxy_pass http://127.0.0.1:4000;
+          proxy_http_version 1.1;
+          proxy_set_header Upgrade $http_upgrade;
+          proxy_set_header Connection "Upgrade";
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          proxy_set_header X-Forwarded-Proto $scheme;
+      }
+  }
+  ```
 

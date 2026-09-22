@@ -186,6 +186,61 @@ io.on('connection', (socket) => {
     }
   });
 
+  // DEV TOOLBAR: Auto-fill remaining open slots with simulated players
+  socket.on('dev_autofill_room', ({ roomId, currentUserId }) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    // Ensure the current user has at least one claimed slot if they don't have one
+    const userSlot = room.players.find(p => p.claimedBy === currentUserId);
+    if (!userSlot) {
+      const firstFree = room.players.find(p => !p.claimedBy);
+      if (firstFree) {
+        firstFree.claimedBy = currentUserId;
+        firstFree.claimedAt = Date.now();
+      }
+    }
+
+    // Auto-fill all other unassigned slots with bot/test IDs
+    room.players.forEach((p, idx) => {
+      if (!p.claimedBy) {
+        p.claimedBy = `sim_bot_player_${idx + 1}`;
+        p.claimedAt = Date.now();
+      }
+    });
+
+    const allClaimed = room.players.every(p => p.claimedBy !== null);
+    if (allClaimed && room.status === 'lobby') {
+      room.status = 'map_building';
+      const randomSpeakerIndex = Math.floor(Math.random() * room.players.length);
+      room.players.forEach((p, idx) => {
+        p.isSpeaker = idx === randomSpeakerIndex;
+      });
+      room.mapState.speakerSlotId = room.players[randomSpeakerIndex].slotId;
+    }
+
+    io.to(roomId).emit('room_state', room);
+  });
+
+  // DEV TOOLBAR: Reset room back to lobby and clear all claims
+  socket.on('dev_reset_room', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room) return;
+
+    room.status = 'lobby';
+    room.players.forEach(p => {
+      p.claimedBy = null;
+      p.claimedAt = null;
+      p.isSpeaker = false;
+    });
+    room.mapState = {
+      placedTiles: {},
+      speakerSlotId: null
+    };
+
+    io.to(roomId).emit('room_state', room);
+  });
+
   socket.on('disconnect', () => {
     // We intentionally keep user claim intact across temporary refreshes via userId/localStorage
   });
