@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DEFAULT_BLUE_TILES } from '../data/blueTiles.js';
+import { DEFAULT_BLUE_TILES, ALL_BLUE_TILES } from '../data/blueTiles.js';
+import { validateBlueTiers } from '../data/tierValidator.js';
 
 export default function CreateRoom({ onCancel }) {
   const navigate = useNavigate();
@@ -15,6 +16,7 @@ export default function CreateRoom({ onCancel }) {
   const [tileMode, setTileMode] = useState('balanced'); // 'random' | 'balanced'
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  const [tierError, setTierError] = useState(null);
   const [showTierConfig, setShowTierConfig] = useState(false);
 
   // Balance tier defaults (все синие тайлы, разбитые по тирам)
@@ -23,6 +25,15 @@ export default function CreateRoom({ onCancel }) {
     tier2: DEFAULT_BLUE_TILES.tier2.join(', '),
     tier3: DEFAULT_BLUE_TILES.tier3.join(', ')
   });
+
+  const handleResetTiers = () => {
+    setTiers({
+      tier1: DEFAULT_BLUE_TILES.tier1.join(', '),
+      tier2: DEFAULT_BLUE_TILES.tier2.join(', '),
+      tier3: DEFAULT_BLUE_TILES.tier3.join(', ')
+    });
+    setTierError(null);
+  };
 
   const handlePlayerCountChange = (newCount) => {
     const count = parseInt(newCount, 10);
@@ -43,13 +54,29 @@ export default function CreateRoom({ onCancel }) {
   const handleCreate = async () => {
     setIsSubmitting(true);
     setError(null);
+    setTierError(null);
+
+    // Валидация тиров синих тайлов в сбалансированном режиме
+    let parsedTiers = null;
+    if (tileMode === 'balanced') {
+      const validation = validateBlueTiers(tiers);
+      if (!validation.isValid) {
+        setTierError(validation.error);
+        setError(validation.error);
+        setShowTierConfig(true); // Автоматически раскрываем блок с ошибкой
+        setIsSubmitting(false);
+        return;
+      }
+      parsedTiers = validation.parsed;
+    }
+
     try {
       const payload = {
         playerCount,
         playerNames: playerNames.slice(0, playerCount),
         expansions,
         tileMode,
-        balanceTiers: {
+        balanceTiers: parsedTiers || {
           tier1: tiers.tier1.split(',').map(s => s.trim()).filter(Boolean),
           tier2: tiers.tier2.split(',').map(s => s.trim()).filter(Boolean),
           tier3: tiers.tier3.split(',').map(s => s.trim()).filter(Boolean),
@@ -63,7 +90,8 @@ export default function CreateRoom({ onCancel }) {
       });
 
       if (!res.ok) {
-        throw new Error('Не удалось создать комнату');
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || 'Не удалось создать комнату');
       }
 
       const data = await res.json();
@@ -217,9 +245,48 @@ export default function CreateRoom({ onCancel }) {
 
           {showTierConfig && (
             <div style={tierModalContentStyle}>
-              <p style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#9ca3af' }}>
-                Укажите номера тайлов через запятую для каждого из трех тиров (баланс синих тайлов):
-              </p>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+                <p style={{ margin: 0, fontSize: '14px', color: '#9ca3af' }}>
+                  Укажите номера тайлов через запятую для каждого из трех тиров (все 51 синий тайл):
+                </p>
+                <button
+                  id="reset-default-tiers-btn"
+                  type="button"
+                  onClick={handleResetTiers}
+                  style={{
+                    backgroundColor: '#1f2937',
+                    color: '#93c5fd',
+                    border: '1px solid #4b5563',
+                    borderRadius: '4px',
+                    padding: '4px 10px',
+                    cursor: 'pointer',
+                    fontSize: '12px',
+                    whiteSpace: 'nowrap'
+                  }}
+                  title="Восстановить распределение по умолчанию"
+                >
+                  Сбросить к дефолту
+                </button>
+              </div>
+
+              {tierError && (
+                <div
+                  id="tier-validation-error-msg"
+                  style={{
+                    backgroundColor: '#7f1d1d',
+                    color: '#fecaca',
+                    padding: '10px 14px',
+                    borderRadius: '6px',
+                    marginBottom: '14px',
+                    fontSize: '13px',
+                    lineHeight: '1.4',
+                    border: '1px solid #ef4444'
+                  }}
+                >
+                  ⚠️ <strong>Ошибка в распределении тайлов:</strong> {tierError}
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                 <div>
                   <span style={{ fontSize: '13px', color: '#93c5fd', fontWeight: 600 }}>Тир 1 (Высокий):</span>
@@ -227,9 +294,12 @@ export default function CreateRoom({ onCancel }) {
                     id="tier1-input"
                     type="text"
                     value={tiers.tier1}
-                    onChange={(e) => setTiers({ ...tiers, tier1: e.target.value })}
+                    onChange={(e) => {
+                      setTiers({ ...tiers, tier1: e.target.value });
+                      if (tierError) setTierError(null);
+                    }}
                     style={{ ...inputStyle, width: '100%', marginTop: '4px' }}
-                    placeholder="Например: 19, 20, 21, 22..."
+                    placeholder="Например: 27, 28, 29, 30..."
                   />
                 </div>
                 <div>
@@ -238,9 +308,12 @@ export default function CreateRoom({ onCancel }) {
                     id="tier2-input"
                     type="text"
                     value={tiers.tier2}
-                    onChange={(e) => setTiers({ ...tiers, tier2: e.target.value })}
+                    onChange={(e) => {
+                      setTiers({ ...tiers, tier2: e.target.value });
+                      if (tierError) setTierError(null);
+                    }}
                     style={{ ...inputStyle, width: '100%', marginTop: '4px' }}
-                    placeholder="Например: 27, 28, 29, 30..."
+                    placeholder="Например: 26, 31, 33, 34..."
                   />
                 </div>
                 <div>
@@ -249,9 +322,12 @@ export default function CreateRoom({ onCancel }) {
                     id="tier3-input"
                     type="text"
                     value={tiers.tier3}
-                    onChange={(e) => setTiers({ ...tiers, tier3: e.target.value })}
+                    onChange={(e) => {
+                      setTiers({ ...tiers, tier3: e.target.value });
+                      if (tierError) setTierError(null);
+                    }}
                     style={{ ...inputStyle, width: '100%', marginTop: '4px' }}
-                    placeholder="Например: 35, 36, 37, 38..."
+                    placeholder="Например: 19, 20, 21, 22..."
                   />
                 </div>
               </div>

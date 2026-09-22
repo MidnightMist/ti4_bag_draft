@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import fs from 'fs';
 import { DEFAULT_BLUE_TILES } from './data/blueTiles.js';
+import { validateBlueTiers } from './data/tierValidator.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -56,17 +57,19 @@ app.post('/api/rooms', (req, res) => {
     });
   }
 
-  const normalizedTiers = {
-    tier1: (balanceTiers?.tier1 && balanceTiers.tier1.length > 0)
-      ? balanceTiers.tier1.map(n => parseInt(n, 10)).filter(n => !isNaN(n))
-      : DEFAULT_BLUE_TILES.tier1,
-    tier2: (balanceTiers?.tier2 && balanceTiers.tier2.length > 0)
-      ? balanceTiers.tier2.map(n => parseInt(n, 10)).filter(n => !isNaN(n))
-      : DEFAULT_BLUE_TILES.tier2,
-    tier3: (balanceTiers?.tier3 && balanceTiers.tier3.length > 0)
-      ? balanceTiers.tier3.map(n => parseInt(n, 10)).filter(n => !isNaN(n))
-      : DEFAULT_BLUE_TILES.tier3,
+  let normalizedTiers = {
+    tier1: DEFAULT_BLUE_TILES.tier1,
+    tier2: DEFAULT_BLUE_TILES.tier2,
+    tier3: DEFAULT_BLUE_TILES.tier3,
   };
+
+  if (tileMode === 'balanced' && balanceTiers) {
+    const validation = validateBlueTiers(balanceTiers);
+    if (!validation.isValid) {
+      return res.status(400).json({ error: validation.error });
+    }
+    normalizedTiers = validation.parsed;
+  }
 
   const roomId = generateRoomId();
   const roomData = {
