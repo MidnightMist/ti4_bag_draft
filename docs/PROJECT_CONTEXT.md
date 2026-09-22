@@ -72,9 +72,14 @@
 
 ---
 
-## 3. Master Tile Catalog & Expansion Sets
+## 3. Master Tile Catalog & Expansion Sets (`tileData.js`)
 
-### Blue Tiles (`blueTiles.js`):
+### Mecatol Rex:
+- **Base Game & PoK:** Tile `18`
+- **Thunder's Edge Active:** Tile `112`
+- Helper: `getMecatolTileId(expansions)`
+
+### Blue Tiles:
 - **Base Game (21 tiles):**
   - IDs: `18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38`
   - Default Tier 1: `27, 28, 29, 30, 35, 37`
@@ -91,9 +96,33 @@
   - Default Tier 2: `98, 99, 100, 105, 106, 107, 108`
   - Default Tier 3: `102, 103, 104, 109, 111`
 
-### Helper Functions in `blueTiles.js`:
-- `getActiveBlueTiles(expansions)`: Returns sorted list of all active blue tiles.
-- `getDefaultTiersForExpansions(expansions)`: Returns filtered Tier 1, 2, and 3 arrays for the active expansions.
+### Red Tiles:
+- **Base Game (12 tiles):** `39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50`
+- **Prophecy of Kings (PoK) (6 tiles):** `67, 68, 77, 78, 79, 80`
+- **Thunder's Edge (5 tiles):** `113, 114, 115, 116, 117`
+- Helper: `getActiveRedTiles(expansions)`
+
+### Anomalies:
+- **Tiles:** `41, 42, 43, 44, 45, 67, 68, 79, 80, 81, 113, 114, 115, 116, 117`
+- Helper: `isAnomaly(tileId)` (returns `boolean`)
+- **Map Rule:** Two anomaly tiles cannot be placed adjacent to each other on the hex grid (unless forced by legal move exhaustion).
+
+### Wormholes:
+- **Alpha Wormholes:** `26, 39, 79, 102`
+  - Helper: `hasAlphaWormhole(tileId)`
+  - **Map Rule:** Two Alpha wormhole tiles cannot be placed adjacent to each other (unless forced).
+- **Beta Wormholes:** `25, 40, 64, 113`
+  - Helper: `hasBetaWormhole(tileId)`
+  - **Map Rule:** Two Beta wormhole tiles cannot be placed adjacent to each other (unless forced).
+- General Helper: `getWormholeType(tileId)` (returns `'alpha' | 'beta' | null`)
+
+### Summary of Helper Functions in `tileData.js` (and re-exported via `blueTiles.js`):
+- `getMecatolTileId(expansions)`: Returns `112` if Thunder's Edge active, else `18`.
+- `getActiveBlueTiles(expansions)`: Returns sorted array of active blue tiles.
+- `getDefaultTiersForExpansions(expansions)`: Returns Tier 1, 2, and 3 arrays for active expansions.
+- `getActiveRedTiles(expansions)`: Returns sorted array of active red tiles.
+- `isAnomaly(tileId)`: Fast Set lookup for anomaly tiles.
+- `hasAlphaWormhole(tileId)` / `hasBetaWormhole(tileId)` / `getWormholeType(tileId)`: Wormhole classifications.
 
 ---
 

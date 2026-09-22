@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { getMecatolTileId } from '../data/tileData.js';
 
 function HexTile({ tileId, label, isPlaceholder, fill = '#181825', stroke = '#3b3b54', strokeWidth = 1.5, strokeDasharray }) {
   const [imgFailed, setImgFailed] = useState(false);
@@ -56,6 +57,8 @@ function HexTile({ tileId, label, isPlaceholder, fill = '#181825', stroke = '#3b
 }
 
 export default function MapGrid({ room, mySlot }) {
+  const mecatolTileId = getMecatolTileId(room?.expansions);
+
   return (
     <div id="map-grid-container" style={{ border: '1px solid #33334d', borderRadius: '12px', padding: '24px', backgroundColor: '#1e1e2d', textAlign: 'center' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
@@ -75,10 +78,10 @@ export default function MapGrid({ room, mySlot }) {
             </clipPath>
           </defs>
 
-          {/* Central tile: Mecatol Rex (18) */}
+          {/* Central tile: Mecatol Rex (18 or 112 with Thunder's Edge) */}
           <HexTile
-            tileId={18}
-            label="Mecatol Rex (18)"
+            tileId={mecatolTileId}
+            label={`Mecatol Rex (${mecatolTileId})`}
             fill="#3b2d54"
             stroke="#a78bfa"
             strokeWidth={2}
