@@ -89,10 +89,10 @@ export default function CreateRoom({ onCancel }) {
         </div>
       )}
 
-      {/* 1.1 Количество игроков */}
+      {/* Количество игроков */}
       <div style={sectionStyle}>
         <label style={labelStyle}>
-          1.1 Количество игроков:
+          Количество игроков:
           <span style={{ marginLeft: '10px', fontWeight: 'bold', color: '#60a5fa' }}>{playerCount}</span>
         </label>
         <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
@@ -115,9 +115,9 @@ export default function CreateRoom({ onCancel }) {
         </div>
       </div>
 
-      {/* 1.2 Имена игроков */}
+      {/* Имена игроков */}
       <div style={sectionStyle}>
-        <label style={labelStyle}>1.2 Имена игроков:</label>
+        <label style={labelStyle}>Имена игроков:</label>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: '12px', marginTop: '8px' }}>
           {playerNames.slice(0, playerCount).map((name, idx) => (
             <div key={idx} style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -135,9 +135,9 @@ export default function CreateRoom({ onCancel }) {
         </div>
       </div>
 
-      {/* 1.3 Дополнения */}
+      {/* Дополнения */}
       <div style={sectionStyle}>
-        <label style={labelStyle}>1.3 Дополнения:</label>
+        <label style={labelStyle}>Дополнения:</label>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
           <label style={checkboxLabelStyle}>
             <input
@@ -162,9 +162,9 @@ export default function CreateRoom({ onCancel }) {
         </div>
       </div>
 
-      {/* 1.4 Режим тайлов */}
+      {/* Режим тайлов */}
       <div style={sectionStyle}>
-        <label style={labelStyle}>1.4 Режим распределения тайлов:</label>
+        <label style={labelStyle}>Режим распределения тайлов:</label>
         <div style={{ display: 'flex', gap: '16px', marginTop: '8px' }}>
           <label style={radioLabelStyle}>
             <input
@@ -191,11 +191,11 @@ export default function CreateRoom({ onCancel }) {
         </div>
       </div>
 
-      {/* 1.5 Настройка баланса (3 тира) */}
+      {/* Настройка баланса (3 тира) */}
       {tileMode === 'balanced' && (
         <div style={sectionStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <label style={labelStyle}>1.5 Настройка баланса тайлов:</label>
+            <label style={labelStyle}>Настройка баланса тайлов:</label>
             <button
               id="toggle-balance-tiers-btn"
               type="button"
