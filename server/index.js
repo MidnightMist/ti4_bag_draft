@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import fs from 'fs';
+import { DEFAULT_BLUE_TILES } from './data/blueTiles.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -35,9 +36,9 @@ app.post('/api/rooms', (req, res) => {
     expansions = { pok: true, thundersEdge: false },
     tileMode = 'balanced', // 'random' | 'balanced'
     balanceTiers = {
-      tier1: [],
-      tier2: [],
-      tier3: []
+      tier1: DEFAULT_BLUE_TILES.tier1,
+      tier2: DEFAULT_BLUE_TILES.tier2,
+      tier3: DEFAULT_BLUE_TILES.tier3
     }
   } = req.body;
 
@@ -55,6 +56,18 @@ app.post('/api/rooms', (req, res) => {
     });
   }
 
+  const normalizedTiers = {
+    tier1: (balanceTiers?.tier1 && balanceTiers.tier1.length > 0)
+      ? balanceTiers.tier1.map(n => parseInt(n, 10)).filter(n => !isNaN(n))
+      : DEFAULT_BLUE_TILES.tier1,
+    tier2: (balanceTiers?.tier2 && balanceTiers.tier2.length > 0)
+      ? balanceTiers.tier2.map(n => parseInt(n, 10)).filter(n => !isNaN(n))
+      : DEFAULT_BLUE_TILES.tier2,
+    tier3: (balanceTiers?.tier3 && balanceTiers.tier3.length > 0)
+      ? balanceTiers.tier3.map(n => parseInt(n, 10)).filter(n => !isNaN(n))
+      : DEFAULT_BLUE_TILES.tier3,
+  };
+
   const roomId = generateRoomId();
   const roomData = {
     id: roomId,
@@ -64,7 +77,7 @@ app.post('/api/rooms', (req, res) => {
       playerCount: count,
       expansions,
       tileMode,
-      balanceTiers
+      balanceTiers: normalizedTiers
     },
     players: formattedPlayers,
     mapState: {

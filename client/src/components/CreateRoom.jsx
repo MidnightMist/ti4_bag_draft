@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { DEFAULT_BLUE_TILES } from '../data/blueTiles.js';
 
 export default function CreateRoom({ onCancel }) {
   const navigate = useNavigate();
@@ -16,11 +17,11 @@ export default function CreateRoom({ onCancel }) {
   const [error, setError] = useState(null);
   const [showTierConfig, setShowTierConfig] = useState(false);
 
-  // Balance tier defaults (sample placeholders for tier management)
+  // Balance tier defaults (все синие тайлы, разбитые по тирам)
   const [tiers, setTiers] = useState({
-    tier1: '19, 20, 21, 22, 23, 24, 25, 26',
-    tier2: '27, 28, 29, 30, 31, 32, 33, 34',
-    tier3: '35, 36, 37, 38, 59, 64, 65, 66'
+    tier1: DEFAULT_BLUE_TILES.tier1.join(', '),
+    tier2: DEFAULT_BLUE_TILES.tier2.join(', '),
+    tier3: DEFAULT_BLUE_TILES.tier3.join(', ')
   });
 
   const handlePlayerCountChange = (newCount) => {
