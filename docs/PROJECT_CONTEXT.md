@@ -139,3 +139,13 @@
 - **Naming Convention:** `ST_{tileId}.png` (e.g. `ST_18.png` for Mecatol Rex, `ST_1.png` for Jord / Sol, etc.).
 - **Server Route:** Express explicitly exposes `/tiles` via `express.static(path.resolve(__dirname, '../client/public/tiles'))`.
 - **UI Rendering & Fallback:** `HexTile` SVG component clips image via `<clipPath id="hex-clip-shape">`, applies crisp outline stroke overlay, and automatically falls back to vector polygon + text label if an image fails to load or is not present.
+
+---
+
+## 6. Server & VPS Deployment Architecture
+- **Server Entry:** `server/index.js` listens on `process.env.PORT || 4000`.
+- **Static Hosting:** When `client/dist` exists, Express serves static files and responds with `index.html` on wildcard routes.
+- **Reverse Proxy Requirement (Nginx/Caddy on VPS):**
+  - If Nginx sits in front, it must forward `/api/` and `/socket.io/` (with WebSocket upgrade headers `Upgrade` and `Connection "upgrade"`) to `http://127.0.0.1:4000` (or whatever `PORT` is configured in PM2).
+  - Alternatively, Nginx can proxy all requests (`location /`) to `http://127.0.0.1:4000` since Express handles both static frontend and API/WebSocket routes directly.
+

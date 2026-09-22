@@ -31,68 +31,79 @@ function generateRoomId() {
 
 // REST API for room creation and querying
 app.post('/api/rooms', (req, res) => {
-  const {
-    playerCount = 6,
-    playerNames = [],
-    expansions = { pok: true, thundersEdge: false },
-    tileMode = 'balanced', // 'random' | 'balanced'
-    balanceTiers = null
-  } = req.body;
+  try {
+    const {
+      playerCount = 6,
+      playerNames = [],
+      expansions = { pok: true, thundersEdge: false },
+      tileMode = 'balanced', // 'random' | 'balanced'
+      balanceTiers = null
+    } = req.body;
 
-  const count = Math.min(Math.max(parseInt(playerCount, 10) || 6, 3), 8);
-  const formattedPlayers = [];
-  for (let i = 0; i < count; i++) {
-    const defaultName = `Player ${i + 1}`;
-    const name = (playerNames[i] && playerNames[i].trim()) ? playerNames[i].trim() : defaultName;
-    formattedPlayers.push({
-      slotId: i,
-      name,
-      claimedBy: null, // userId if claimed
-      claimedAt: null,
-      isSpeaker: false
-    });
-  }
+    const count = Math.min(Math.max(parseInt(playerCount, 10) || 6, 3), 8);
+    const formattedPlayers = [];
+    for (let i = 0; i < count; i++) {
+      const defaultName = `Player ${i + 1}`;
+      const name = (playerNames[i] && playerNames[i].trim()) ? playerNames[i].trim() : defaultName;
+      formattedPlayers.push({
+        slotId: i,
+        name,
+        claimedBy: null, // userId if claimed
+        claimedAt: null,
+        isSpeaker: false
+      });
+    }
 
-  let normalizedTiers = getDefaultTiersForExpansions(expansions);
+    let normalizedTiers = getDefaultTiersForExpansions(expansions);
 
-  if (tileMode === 'balanced') {
-    if (balanceTiers) {
-      const validation = validateBlueTiers(balanceTiers, expansions);
-      if (!validation.isValid) {
-        return res.status(400).json({ error: validation.error });
+    if (tileMode === 'balanced') {
+      if (balanceTiers) {
+        const validation = validateBlueTiers(balanceTiers, expansions);
+        if (!validation.isValid) {
+          return res.status(400).json({ error: validation.error });
+        }
+        normalizedTiers = validation.parsed;
       }
-      normalizedTiers = validation.parsed;
     }
+
+    const roomId = generateRoomId();
+    const roomData = {
+      id: roomId,
+      createdAt: Date.now(),
+      status: 'lobby', // 'lobby' | 'map_building' | 'completed'
+      settings: {
+        playerCount: count,
+        expansions,
+        tileMode,
+        balanceTiers: normalizedTiers
+      },
+      players: formattedPlayers,
+      mapState: {
+        placedTiles: {}, // index/coord -> tile
+        speakerSlotId: null
+      }
+    };
+
+    rooms.set(roomId, roomData);
+    console.log(`[Room Created] Room ID: ${roomId}, Players: ${count}, Mode: ${tileMode}`);
+    res.json({ success: true, roomId, room: roomData });
+  } catch (err) {
+    console.error('[Error creating room]:', err);
+    res.status(500).json({ error: err.message || 'Internal server error while creating room' });
   }
-
-  const roomId = generateRoomId();
-  const roomData = {
-    id: roomId,
-    createdAt: Date.now(),
-    status: 'lobby', // 'lobby' | 'map_building' | 'completed'
-    settings: {
-      playerCount: count,
-      expansions,
-      tileMode,
-      balanceTiers: normalizedTiers
-    },
-    players: formattedPlayers,
-    mapState: {
-      placedTiles: {}, // index/coord -> tile
-      speakerSlotId: null
-    }
-  };
-
-  rooms.set(roomId, roomData);
-  res.json({ success: true, roomId, room: roomData });
 });
 
 app.get('/api/rooms/:id', (req, res) => {
-  const room = rooms.get(req.params.id);
-  if (!room) {
-    return res.status(404).json({ error: 'Room not found' });
+  try {
+    const room = rooms.get(req.params.id);
+    if (!room) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+    res.json({ room });
+  } catch (err) {
+    console.error('[Error fetching room]:', err);
+    res.status(500).json({ error: err.message || 'Internal server error while fetching room' });
   }
-  res.json({ room });
 });
 
 // Socket.io for real-time room and claim synchronization

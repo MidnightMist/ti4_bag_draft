@@ -19,8 +19,15 @@ export default function RoomView() {
   useEffect(() => {
     // 1. Initial REST fetch for fast load
     fetch(`/api/rooms/${roomId}`)
-      .then((res) => {
-        if (!res.ok) throw new Error('Room not found');
+      .then(async (res) => {
+        if (!res.ok) {
+          const contentType = res.headers.get('content-type') || '';
+          if (contentType.includes('application/json')) {
+            const data = await res.json().catch(() => ({}));
+            throw new Error(data.error || `Room not found (${res.status})`);
+          }
+          throw new Error(`Failed to load room (${res.status}). Server returned non-JSON response.`);
+        }
         return res.json();
       })
       .then((data) => {

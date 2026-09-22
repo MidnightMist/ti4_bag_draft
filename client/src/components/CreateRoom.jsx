@@ -110,9 +110,25 @@ export default function CreateRoom({ onCancel }) {
         body: JSON.stringify(payload),
       });
 
+      const contentType = res.headers.get('content-type') || '';
       if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error || 'Failed to create room');
+        if (contentType.includes('application/json')) {
+          const errorData = await res.json().catch(() => ({}));
+          throw new Error(errorData.error || `Server error (${res.status})`);
+        } else {
+          const rawText = await res.text().catch(() => '');
+          if (res.status === 404) {
+            throw new Error(`HTTP 404 Not Found: /api/rooms was not found. Please verify your web server/reverse proxy routes /api to the Node.js backend.`);
+          } else if (res.status === 502) {
+            throw new Error('HTTP 502 Bad Gateway: The backend server is unreachable. Check if the Node.js/PM2 service is running and listening on the expected port.');
+          } else {
+            throw new Error(`Server returned error ${res.status}: ${rawText.slice(0, 120) || 'Unexpected error'}`);
+          }
+        }
+      }
+
+      if (!contentType.includes('application/json')) {
+        throw new Error('Server returned an invalid response format (HTML instead of JSON). Check your Nginx or reverse proxy configuration for /api.');
       }
 
       const data = await res.json();
