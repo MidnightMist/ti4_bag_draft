@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { DEFAULT_BLUE_TILES, ALL_BLUE_TILES } from '../data/blueTiles.js';
+import {
+  DEFAULT_BLUE_TILES,
+  ALL_BLUE_TILES,
+  getActiveBlueTiles,
+  getDefaultTiersForExpansions
+} from '../data/blueTiles.js';
 import { validateBlueTiers } from '../data/tierValidator.js';
 
 export default function CreateRoom({ onCancel }) {
@@ -19,18 +24,34 @@ export default function CreateRoom({ onCancel }) {
   const [tierError, setTierError] = useState(null);
   const [showTierConfig, setShowTierConfig] = useState(false);
 
-  // Balance tier defaults (все синие тайлы, разбитые по тирам)
+  // Balance tier defaults (синие тайлы выбранных дополнений по тирам)
+  const initialDefaultTiers = getDefaultTiersForExpansions({ pok: true, thundersEdge: false });
   const [tiers, setTiers] = useState({
-    tier1: DEFAULT_BLUE_TILES.tier1.join(', '),
-    tier2: DEFAULT_BLUE_TILES.tier2.join(', '),
-    tier3: DEFAULT_BLUE_TILES.tier3.join(', ')
+    tier1: initialDefaultTiers.tier1.join(', '),
+    tier2: initialDefaultTiers.tier2.join(', '),
+    tier3: initialDefaultTiers.tier3.join(', ')
   });
 
   const handleResetTiers = () => {
+    const defaultTiers = getDefaultTiersForExpansions(expansions);
     setTiers({
-      tier1: DEFAULT_BLUE_TILES.tier1.join(', '),
-      tier2: DEFAULT_BLUE_TILES.tier2.join(', '),
-      tier3: DEFAULT_BLUE_TILES.tier3.join(', ')
+      tier1: defaultTiers.tier1.join(', '),
+      tier2: defaultTiers.tier2.join(', '),
+      tier3: defaultTiers.tier3.join(', ')
+    });
+    setTierError(null);
+  };
+
+  const handleExpansionToggle = (expKey, isChecked) => {
+    const updatedExpansions = { ...expansions, [expKey]: isChecked };
+    setExpansions(updatedExpansions);
+
+    // При смене дополнений обновляем дефолтные тиры тайлов
+    const updatedDefaultTiers = getDefaultTiersForExpansions(updatedExpansions);
+    setTiers({
+      tier1: updatedDefaultTiers.tier1.join(', '),
+      tier2: updatedDefaultTiers.tier2.join(', '),
+      tier3: updatedDefaultTiers.tier3.join(', ')
     });
     setTierError(null);
   };
@@ -56,10 +77,10 @@ export default function CreateRoom({ onCancel }) {
     setError(null);
     setTierError(null);
 
-    // Валидация тиров синих тайлов в сбалансированном режиме
+    // Валидация тиров синих тайлов в сбалансированном режиме с учетом выбранных дополнений
     let parsedTiers = null;
     if (tileMode === 'balanced') {
-      const validation = validateBlueTiers(tiers);
+      const validation = validateBlueTiers(tiers, expansions);
       if (!validation.isValid) {
         setTierError(validation.error);
         setError(validation.error);
@@ -173,7 +194,7 @@ export default function CreateRoom({ onCancel }) {
               id="expansion-pok-checkbox"
               type="checkbox"
               checked={expansions.pok}
-              onChange={(e) => setExpansions({ ...expansions, pok: e.target.checked })}
+              onChange={(e) => handleExpansionToggle('pok', e.target.checked)}
               style={{ width: '18px', height: '18px', cursor: 'pointer' }}
             />
             <span style={{ color: '#e5e7eb', fontSize: '15px' }}>Prophecy of Kings (PoK)</span>
@@ -183,7 +204,7 @@ export default function CreateRoom({ onCancel }) {
               id="expansion-thundersedge-checkbox"
               type="checkbox"
               checked={expansions.thundersEdge}
-              onChange={(e) => setExpansions({ ...expansions, thundersEdge: e.target.checked })}
+              onChange={(e) => handleExpansionToggle('thundersEdge', e.target.checked)}
               style={{ width: '18px', height: '18px', cursor: 'pointer' }}
             />
             <span style={{ color: '#e5e7eb', fontSize: '15px' }}>Thunder's Edge</span>
@@ -247,7 +268,7 @@ export default function CreateRoom({ onCancel }) {
             <div style={tierModalContentStyle}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                 <p style={{ margin: 0, fontSize: '14px', color: '#9ca3af' }}>
-                  Укажите номера тайлов через запятую для каждого из трех тиров (все 51 синий тайл):
+                  Укажите номера тайлов через запятую для каждого из трех тиров:
                 </p>
                 <button
                   id="reset-default-tiers-btn"
@@ -263,7 +284,7 @@ export default function CreateRoom({ onCancel }) {
                     fontSize: '12px',
                     whiteSpace: 'nowrap'
                   }}
-                  title="Восстановить распределение по умолчанию"
+                  title="Восстановить распределение по умолчанию для выбранных дополнений"
                 >
                   Сбросить к дефолту
                 </button>

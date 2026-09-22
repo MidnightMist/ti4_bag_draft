@@ -1,13 +1,15 @@
-import { ALL_BLUE_TILES } from './blueTiles.js';
-
-const ALL_BLUE_SET = new Set(ALL_BLUE_TILES);
+import { getActiveBlueTiles } from './blueTiles.js';
 
 /**
- * Валидирует распределение синих тайлов по тирам.
+ * Валидирует распределение синих тайлов по тирам с учетом активных дополнений.
  * @param {{ tier1: string | number[], tier2: string | number[], tier3: string | number[] }} rawTiers
+ * @param {{ pok?: boolean, thundersEdge?: boolean }} expansions
  * @returns {{ isValid: boolean, error?: string, parsed?: { tier1: number[], tier2: number[], tier3: number[] } }}
  */
-export function validateBlueTiers(rawTiers) {
+export function validateBlueTiers(rawTiers, expansions = { pok: true, thundersEdge: false }) {
+  const activeBlueList = getActiveBlueTiles(expansions);
+  const activeBlueSet = new Set(activeBlueList);
+
   const parseTier = (tierValue, tierName) => {
     if (tierValue === undefined || tierValue === null) {
       return { numbers: [], invalidTokens: [] };
@@ -68,11 +70,11 @@ export function validateBlueTiers(rawTiers) {
     };
   }
 
-  // 2. Проверка, что используются только существующие номера синих тайлов
+  // 2. Проверка, что используются только номера синих тайлов из активных дополнений
   const checkUnknown = (nums, tierLabel) => {
-    const unknown = nums.filter(num => !ALL_BLUE_SET.has(num));
+    const unknown = nums.filter(num => !activeBlueSet.has(num));
     if (unknown.length > 0) {
-      return `В строке «${tierLabel}» указаны номера, не являющиеся синими тайлами: ${unknown.join(', ')}`;
+      return `В строке «${tierLabel}» указаны тайлы, не входящие в синие тайлы выбранных дополнений: ${unknown.join(', ')}`;
     }
     return null;
   };
@@ -141,14 +143,14 @@ export function validateBlueTiers(rawTiers) {
     };
   }
 
-  // 5. Проверка, что ВСЕ синие тайлы указаны в строчках
+  // 5. Проверка, что ВСЕ синие тайлы активных дополнений указаны в строчках
   const allSpecified = new Set([...parsed1.numbers, ...parsed2.numbers, ...parsed3.numbers]);
-  const missingTiles = ALL_BLUE_TILES.filter(tileId => !allSpecified.has(tileId));
+  const missingTiles = activeBlueList.filter(tileId => !allSpecified.has(tileId));
 
   if (missingTiles.length > 0) {
     return {
       isValid: false,
-      error: `Не все синие тайлы распределены! Пропущено тайлов (${missingTiles.length}): ${missingTiles.join(', ')}`
+      error: `Не все синие тайлы распределены! Пропущено тайлов (${missingTiles.length} из ${activeBlueList.length}): ${missingTiles.join(', ')}`
     };
   }
 

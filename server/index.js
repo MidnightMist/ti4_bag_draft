@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
 import fs from 'fs';
-import { DEFAULT_BLUE_TILES } from './data/blueTiles.js';
+import { DEFAULT_BLUE_TILES, getDefaultTiersForExpansions } from './data/blueTiles.js';
 import { validateBlueTiers } from './data/tierValidator.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -36,11 +36,7 @@ app.post('/api/rooms', (req, res) => {
     playerNames = [],
     expansions = { pok: true, thundersEdge: false },
     tileMode = 'balanced', // 'random' | 'balanced'
-    balanceTiers = {
-      tier1: DEFAULT_BLUE_TILES.tier1,
-      tier2: DEFAULT_BLUE_TILES.tier2,
-      tier3: DEFAULT_BLUE_TILES.tier3
-    }
+    balanceTiers = null
   } = req.body;
 
   const count = Math.min(Math.max(parseInt(playerCount, 10) || 6, 3), 8);
@@ -57,18 +53,16 @@ app.post('/api/rooms', (req, res) => {
     });
   }
 
-  let normalizedTiers = {
-    tier1: DEFAULT_BLUE_TILES.tier1,
-    tier2: DEFAULT_BLUE_TILES.tier2,
-    tier3: DEFAULT_BLUE_TILES.tier3,
-  };
+  let normalizedTiers = getDefaultTiersForExpansions(expansions);
 
-  if (tileMode === 'balanced' && balanceTiers) {
-    const validation = validateBlueTiers(balanceTiers);
-    if (!validation.isValid) {
-      return res.status(400).json({ error: validation.error });
+  if (tileMode === 'balanced') {
+    if (balanceTiers) {
+      const validation = validateBlueTiers(balanceTiers, expansions);
+      if (!validation.isValid) {
+        return res.status(400).json({ error: validation.error });
+      }
+      normalizedTiers = validation.parsed;
     }
-    normalizedTiers = validation.parsed;
   }
 
   const roomId = generateRoomId();
