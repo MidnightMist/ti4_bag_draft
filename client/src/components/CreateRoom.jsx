@@ -16,7 +16,7 @@ export default function CreateRoom({ onCancel }) {
   ]);
   const [expansions, setExpansions] = useState({
     pok: true,
-    thundersEdge: false,
+    thundersEdge: true,
   });
   const [tileMode, setTileMode] = useState('balanced'); // 'random' | 'balanced'
   const [isSubmitting, setIsSubmitting] = useState(false);
