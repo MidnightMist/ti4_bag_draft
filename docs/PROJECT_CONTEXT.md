@@ -60,22 +60,40 @@
 - **Multi-Tab Isolation:**
   - Users can append `?user=<id>` to the room URL (e.g. `/room/:roomId?user=p2`) or click the "+ Tab Player N" shortcut to open separate isolated player sessions without needing incognito windows.
 
-### Phase 3: Tile Dealing & Map Building (Next Implementation Step)
-1. **Player Hands:**
-   - Each player receives **3 Blue tiles** and **2 Red tiles**.
-   - If Balanced mode: 1 Tier 1 + 1 Tier 2 + 1 Tier 3 blue tile, plus 2 random red tiles.
-   - If Random mode: 3 random blue tiles + 2 random red tiles.
-   - Sidebar/HUD shows all players, speaker token, and remaining tile counts (tile faces remain hidden from opponents).
-2. **Draft / Placement Sequence (Snake Order):**
+### Phase 3: Map Building Interface & Board Geometry (`MapGrid.jsx`, `PlayerHandPanel.jsx`)
+1. **Hexagonal Grid Geometry (Flat-Topped TI4 Standard):**
+   - Flat-topped regular hexagons: Width $2R$, Height $H = \sqrt{3}R$ ($R = 54\text{px}$). Top and bottom edges are horizontal flat lines.
+   - Total of 37 hexes across 3 complete rings centered around Mecatol Rex (Tile 18 or 112):
+     - **Ring 0:** 1 center hex (Mecatol Rex).
+     - **Ring 1:** 6 hexes (sharing flat horizontal edges North and South).
+     - **Ring 2:** 12 hexes (6 corners at radius $2$, 6 edge midpoints).
+     - **Ring 3:** 18 hexes (6 outer corners + 12 intermediate edge hexes).
+2. **Green Home System Tiles:**
+   - The 6 outer corners of Ring 3 represent the 6 player Home Systems.
+   - Styled in emerald green (`#064e3b` / `#059669` with `#34d399` stroke) replacing generic placeholders.
+   - Each Home System displays the player's name in bold white, "HOME SYSTEM" label, speaker crown 👑 if speaker, and "YOU" badge for the viewing player.
+   - Next to each Home System are two mini-hexagons:
+     - **Blue Mini-Hex:** Displays remaining Blue tiles in hand (e.g. `3`).
+     - **Red Mini-Hex:** Displays remaining Red tiles in hand (e.g. `2`).
+3. **Player-Centric Dynamic Map Rotation:**
+   - The map rotates so that the viewing player's home system is always oriented towards them (at the bottom / South position $(0, 3H)$).
+   - If player slot is $V \in \{0..5\}$, coordinate rotation angle is $\theta = -V \times 60^\circ$ ($-V \frac{\pi}{3}$ rad).
+   - Since $60^\circ$ is a 6-fold symmetry, the rotated grid aligns onto the hex lattice, while hex polygons remain upright so all player names and numbers remain horizontal and legible.
+4. **Layout Optimization & 5-Tile Player Hand Panel:**
+   - In `map_building` status, the layout splits into a compact left sidebar (room header, ready status, and player roster) and a large central game board.
+   - Directly underneath the hex map is `PlayerHandPanel` displaying the player's 5 tiles (3 Blue and 2 Red), ready for selection and placement during their turn.
+
+### Phase 4: Draft / Placement Sequence (Snake Order):
+1. **Draft Order:**
    - Starting from the Speaker: `1 -> 2 -> ... -> N -> N -> ... -> 2 -> 1 -> 1 -> ...`
    - Active player selects a tile from hand, clicks an available valid hex, reviews validation, and confirms with "Apply".
-3. **Hex Placement Rules:**
+2. **Hex Placement Rules:**
    - **Rings Order:** Ring 1 (around Mecatol Rex) must be fully completed before Ring 2 can be placed. Ring 2 must be fully completed before Ring 3.
    - **Adjacency Restrictions:**
      - Anomalies cannot be adjacent to other anomalies (unless no other legal placement exists).
      - Alpha wormholes cannot be adjacent to Alpha wormholes (unless forced).
      - Beta wormholes cannot be adjacent to Beta wormholes (unless forced).
-4. **Final Stage:**
+3. **Final Stage:**
    - Completed interactive map view with shareable permalink.
 
 ---

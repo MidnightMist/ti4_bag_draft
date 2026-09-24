@@ -7,6 +7,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { DEFAULT_BLUE_TILES, getDefaultTiersForExpansions } from './data/blueTiles.js';
 import { validateBlueTiers } from './data/tierValidator.js';
+import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles } from './data/tileData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -27,6 +28,75 @@ const rooms = new Map();
 
 function generateRoomId() {
   return crypto.randomBytes(4).toString('hex'); // 8-char hex code (e.g. "a3f89b1c")
+}
+
+/**
+ * Deal 3 Blue and 2 Red tiles to each player in the room.
+ * Balanced mode: 1 Tier 1 + 1 Tier 2 + 1 Tier 3 blue tiles, plus 2 red tiles.
+ * Random mode: 3 random blue tiles + 2 red tiles.
+ */
+function dealPlayerHands(room) {
+  if (!room || !room.players || room.players.length === 0) return;
+  const expansions = room.settings.expansions;
+  const mecatolId = getMecatolTileId(expansions);
+  const isBalanced = room.settings.tileMode === 'balanced';
+
+  // Shuffle helper (Fisher-Yates)
+  const shuffle = (array) => {
+    const arr = [...array];
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  };
+
+  // Red tiles pool (excluding any invalid)
+  const redPool = shuffle(getActiveRedTiles(expansions));
+
+  if (isBalanced) {
+    const tiers = room.settings.balanceTiers || getDefaultTiersForExpansions(expansions);
+    const t1 = shuffle((tiers.tier1 || []).filter(id => id !== mecatolId));
+    const t2 = shuffle((tiers.tier2 || []).filter(id => id !== mecatolId));
+    const t3 = shuffle((tiers.tier3 || []).filter(id => id !== mecatolId));
+
+    room.players.forEach((p) => {
+      const pBlue = [];
+      if (t1.length > 0) pBlue.push(t1.pop());
+      if (t2.length > 0) pBlue.push(t2.pop());
+      if (t3.length > 0) pBlue.push(t3.pop());
+
+      const pRed = [];
+      if (redPool.length > 0) pRed.push(redPool.pop());
+      if (redPool.length > 0) pRed.push(redPool.pop());
+
+      p.hand = {
+        blue: pBlue,
+        red: pRed
+      };
+      p.remainingBlue = pBlue.length;
+      p.remainingRed = pRed.length;
+    });
+  } else {
+    const bluePool = shuffle(getActiveBlueTiles(expansions).filter(id => id !== mecatolId));
+    room.players.forEach((p) => {
+      const pBlue = [];
+      for (let i = 0; i < 3; i++) {
+        if (bluePool.length > 0) pBlue.push(bluePool.pop());
+      }
+      const pRed = [];
+      for (let i = 0; i < 2; i++) {
+        if (redPool.length > 0) pRed.push(redPool.pop());
+      }
+
+      p.hand = {
+        blue: pBlue,
+        red: pRed
+      };
+      p.remainingBlue = pBlue.length;
+      p.remainingRed = pRed.length;
+    });
+  }
 }
 
 // REST API for room creation and querying
@@ -99,6 +169,10 @@ app.get('/api/rooms/:id', (req, res) => {
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });
     }
+    // Auto-deal if already in map_building but hands missing
+    if (room.status === 'map_building' && room.players.some(p => !p.hand)) {
+      dealPlayerHands(room);
+    }
     res.json({ room });
   } catch (err) {
     console.error('[Error fetching room]:', err);
@@ -166,6 +240,7 @@ io.on('connection', (socket) => {
         p.isSpeaker = idx === randomSpeakerIndex;
       });
       room.mapState.speakerSlotId = room.players[randomSpeakerIndex].slotId;
+      dealPlayerHands(room);
     }
 
     io.to(roomId).emit('room_state', room);
@@ -217,6 +292,7 @@ io.on('connection', (socket) => {
         p.isSpeaker = idx === randomSpeakerIndex;
       });
       room.mapState.speakerSlotId = room.players[randomSpeakerIndex].slotId;
+      dealPlayerHands(room);
     }
 
     io.to(roomId).emit('room_state', room);
@@ -232,6 +308,9 @@ io.on('connection', (socket) => {
       p.claimedBy = null;
       p.claimedAt = null;
       p.isSpeaker = false;
+      p.hand = null;
+      p.remainingBlue = 3;
+      p.remainingRed = 2;
     });
     room.mapState = {
       placedTiles: {},
