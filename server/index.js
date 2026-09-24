@@ -207,13 +207,17 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Check if player already claimed another slot
-    const existingSlot = room.players.find(p => p.claimedBy === userId);
-    if (existingSlot && existingSlot.slotId !== slotId) {
-      // Release previously claimed slot
-      existingSlot.claimedBy = null;
-      existingSlot.claimedAt = null;
-    }
+    const validUserId = (userId && typeof userId === 'string' && userId.trim() !== '' && userId !== 'null' && userId !== 'undefined')
+      ? userId 
+      : `user_dev_${Math.random().toString(36).substring(2, 8)}`;
+
+    // Release any other slot claimed by validUserId
+    room.players.forEach(p => {
+      if (p.claimedBy === validUserId && p.slotId !== slotId) {
+        p.claimedBy = null;
+        p.claimedAt = null;
+      }
+    });
 
     const targetSlot = room.players.find(p => p.slotId === slotId);
     if (!targetSlot) {
@@ -221,13 +225,13 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (targetSlot.claimedBy && targetSlot.claimedBy !== userId) {
+    if (targetSlot.claimedBy && targetSlot.claimedBy !== validUserId) {
       socket.emit('room_error', { message: 'This slot is already claimed by another player' });
       return;
     }
 
     // Claim slot
-    targetSlot.claimedBy = userId;
+    targetSlot.claimedBy = validUserId;
     targetSlot.claimedAt = Date.now();
 
     // Check if all players are claimed
@@ -250,8 +254,9 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room) return;
 
+    const validUserId = (userId && typeof userId === 'string' && userId.trim() !== '' && userId !== 'null' && userId !== 'undefined') ? userId : null;
     const slot = room.players.find(p => p.slotId === slotId);
-    if (slot && slot.claimedBy === userId) {
+    if (slot && validUserId && slot.claimedBy === validUserId) {
       slot.claimedBy = null;
       slot.claimedAt = null;
       if (room.status === 'map_building') {
@@ -266,20 +271,33 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room) return;
 
-    // Ensure the current user has at least one claimed slot if they don't have one
-    const userSlot = room.players.find(p => p.claimedBy === currentUserId);
+    const validUserId = (currentUserId && typeof currentUserId === 'string' && currentUserId.trim() !== '' && currentUserId !== 'null' && currentUserId !== 'undefined')
+      ? currentUserId 
+      : `user_dev_${Math.random().toString(36).substring(2, 8)}`;
+
+    // Ensure validUserId has at least one claimed slot
+    let userSlot = room.players.find(p => p.claimedBy === validUserId);
     if (!userSlot) {
       const firstFree = room.players.find(p => !p.claimedBy);
       if (firstFree) {
-        firstFree.claimedBy = currentUserId;
+        firstFree.claimedBy = validUserId;
         firstFree.claimedAt = Date.now();
+        userSlot = firstFree;
       }
     }
 
-    // Auto-fill all other unassigned slots with bot/test IDs
+    // Ensure no other slot has validUserId
+    room.players.forEach(p => {
+      if (p.claimedBy === validUserId && p.slotId !== userSlot?.slotId) {
+        p.claimedBy = null;
+        p.claimedAt = null;
+      }
+    });
+
+    // Auto-fill all other unassigned slots with unique bot/test IDs
     room.players.forEach((p, idx) => {
       if (!p.claimedBy) {
-        p.claimedBy = `sim_bot_player_${idx + 1}`;
+        p.claimedBy = `sim_bot_${room.id}_s${idx + 1}`;
         p.claimedAt = Date.now();
       }
     });

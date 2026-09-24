@@ -122,7 +122,7 @@ export default function RoomView() {
     );
   }
 
-  const myClaimedSlot = room.players.find((p) => p.claimedBy === userId);
+  const myClaimedSlot = room.players.find((p) => Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId);
   const totalSlots = room.players.length;
   const claimedCount = room.players.filter((p) => p.claimedBy !== null).length;
   const isLobby = room.status === 'lobby';
@@ -201,7 +201,7 @@ export default function RoomView() {
               margin: '0 auto',
             }}>
               {room.players.map((slot) => {
-                const isClaimedByMe = slot.claimedBy === userId;
+                const isClaimedByMe = Boolean(userId) && Boolean(slot.claimedBy) && slot.claimedBy === userId;
                 const isClaimedByOther = slot.claimedBy && slot.claimedBy !== userId;
                 const isFree = !slot.claimedBy;
 
@@ -439,7 +439,7 @@ export default function RoomView() {
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {room.players.map((p) => {
-                  const isMe = p.claimedBy === userId;
+                  const isMe = Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId;
                   const blueCount = p.remainingBlue ?? p.hand?.blue?.length ?? 3;
                   const redCount = p.remainingRed ?? p.hand?.red?.length ?? 2;
 

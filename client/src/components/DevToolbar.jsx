@@ -31,7 +31,7 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
     window.open(targetUrl, `_blank`);
   };
 
-  const activeSlot = room.players.find(p => p.claimedBy === currentUserId);
+  const activeSlot = room.players.find(p => Boolean(currentUserId) && p.claimedBy && p.claimedBy === currentUserId);
 
   return (
     <div
@@ -121,7 +121,7 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
 
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {room.players.map((player) => {
-                const isCurrent = player.claimedBy === currentUserId;
+                const isCurrent = Boolean(currentUserId) && Boolean(player.claimedBy) && player.claimedBy === currentUserId;
                 const isClaimed = !!player.claimedBy;
 
                 return (
