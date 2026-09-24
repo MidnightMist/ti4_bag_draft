@@ -46,175 +46,205 @@ function HexTile({
   label,
   subLabel,
   isPlaceholder,
+  isPending = false,
   fill = '#161622',
   stroke = '#3b3b54',
-  strokeWidth = 1.5,
+  strokeWidth = 1,
   strokeDasharray,
   isHomeSystem = false,
   playerName = '',
   isViewer = false,
   isSpeaker = false,
   onClick,
+  onMouseEnter,
+  onMouseLeave,
   cursor = 'default',
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = tileId && !imgFailed;
-  const hexPoints = getFlatHexPoints(cx, cy, R);
-
-  // Home System Green Styling
-  if (isHomeSystem) {
-    return (
-      <g className="home-system-tile" style={{ cursor: 'pointer' }} onClick={onClick}>
-        {/* Glow if viewer */}
-        {isViewer && (
-          <polygon
-            points={getFlatHexPoints(cx, cy, R + 5)}
-            fill="none"
-            stroke="#34d399"
-            strokeWidth="3.5"
-            strokeOpacity="0.55"
-          />
-        )}
-
-        {/* Base Green Polygon */}
-        <polygon
-          points={hexPoints}
-          fill="url(#green-home-system-grad)"
-          stroke={isViewer ? '#34d399' : '#059669'}
-          strokeWidth={isViewer ? 3 : 2}
-        />
-
-        {/* Inner subtle border accent */}
-        <polygon
-          points={getFlatHexPoints(cx, cy, R - 6)}
-          fill="none"
-          stroke="#10b981"
-          strokeWidth="1"
-          strokeOpacity="0.4"
-          strokeDasharray="4 3"
-        />
-
-        {/* Speaker Crown if applicable */}
-        {isSpeaker && (
-          <text
-            x={cx}
-            y={cy - 24}
-            textAnchor="middle"
-            fontSize="16"
-            style={{ pointerEvents: 'none', userSelect: 'none' }}
-          >
-            👑
-          </text>
-        )}
-
-        {/* "YOU" badge if viewer */}
-        {isViewer && !isSpeaker && (
-          <g transform={`translate(${cx}, ${cy - 27})`}>
-            <rect x="-20" y="-9" width="40" height="17" rx="4" fill="#047857" stroke="#34d399" strokeWidth="1" />
-            <text x="0" y="3" textAnchor="middle" fill="#ecfdf5" fontSize="10" fontWeight="bold">
-              YOU
-            </text>
-          </g>
-        )}
-
-        {/* Player Name */}
-        <text
-          x={cx}
-          y={cy}
-          textAnchor="middle"
-          fill="#ffffff"
-          fontSize="14"
-          fontWeight="700"
-          style={{
-            pointerEvents: 'none',
-            userSelect: 'none',
-            textShadow: '0 2px 4px rgba(0,0,0,0.95)',
-          }}
-        >
-          {playerName || label}
-        </text>
-
-        {/* Subtitle "HOME SYSTEM" */}
-        <text
-          x={cx}
-          y={cy + 19}
-          textAnchor="middle"
-          fill="#a7f3d0"
-          fontSize="10"
-          fontWeight="600"
-          letterSpacing="0.05em"
-          style={{
-            pointerEvents: 'none',
-            userSelect: 'none',
-            textTransform: 'uppercase',
-            textShadow: '0 1px 2px rgba(0,0,0,0.8)',
-          }}
-        >
-          Home System
-        </text>
-      </g>
-    );
-  }
+  const hexPoints = getFlatHexPoints(0, 0, R);
+  const clipId = `hex-clip-${Math.abs(Math.round(cx))}-${Math.abs(Math.round(cy))}-${tileId || 'home'}`;
 
   return (
-    <g className="map-hex-tile" onClick={onClick} style={{ cursor }}>
-      {/* Background polygon */}
-      <polygon
-        points={hexPoints}
-        fill={fill}
-        stroke={stroke}
-        strokeWidth={strokeWidth}
-        strokeDasharray={strokeDasharray}
-      />
+    <g
+      transform={`translate(${cx}, ${cy})`}
+      className="map-hex-tile"
+      onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+      style={{ cursor }}
+    >
+      <defs>
+        <clipPath id={clipId}>
+          <polygon points={hexPoints} />
+        </clipPath>
+      </defs>
 
-      {/* Tile image if available */}
-      {showImage && (
-        <>
-          <g clipPath="url(#hex-clip-shape)">
+      {/* Home System Green Styling */}
+      {isHomeSystem ? (
+        <g className="home-system-tile">
+          {/* Glow if viewer */}
+          {isViewer && (
+            <polygon
+              points={getFlatHexPoints(0, 0, R + 5)}
+              fill="none"
+              stroke="#34d399"
+              strokeWidth="3.5"
+              strokeOpacity="0.55"
+            />
+          )}
+
+          {/* Base Green Polygon */}
+          <polygon
+            points={hexPoints}
+            fill="url(#green-home-system-grad)"
+            stroke={isViewer ? '#34d399' : '#059669'}
+            strokeWidth={isViewer ? 3 : 2}
+          />
+
+          {/* Inner subtle border accent */}
+          <polygon
+            points={getFlatHexPoints(0, 0, R - 6)}
+            fill="none"
+            stroke="#10b981"
+            strokeWidth="1"
+            strokeOpacity="0.4"
+            strokeDasharray="4 3"
+          />
+
+          {/* Speaker Crown if applicable */}
+          {isSpeaker && (
+            <text
+              x={0}
+              y={-24}
+              textAnchor="middle"
+              fontSize="16"
+              style={{ pointerEvents: 'none', userSelect: 'none' }}
+            >
+              👑
+            </text>
+          )}
+
+          {/* "YOU" badge if viewer */}
+          {isViewer && !isSpeaker && (
+            <g transform={`translate(0, -27)`}>
+              <rect x="-20" y="-9" width="40" height="17" rx="4" fill="#047857" stroke="#34d399" strokeWidth="1" />
+              <text x="0" y="3" textAnchor="middle" fill="#ecfdf5" fontSize="10" fontWeight="bold">
+                YOU
+              </text>
+            </g>
+          )}
+
+          {/* Player Name */}
+          <text
+            x={0}
+            y={0}
+            textAnchor="middle"
+            fill="#ffffff"
+            fontSize="14"
+            fontWeight="700"
+            style={{
+              pointerEvents: 'none',
+              userSelect: 'none',
+              textShadow: '0 2px 4px rgba(0,0,0,0.95)',
+            }}
+          >
+            {playerName || label}
+          </text>
+
+          {/* Subtitle "HOME SYSTEM" */}
+          <text
+            x={0}
+            y={19}
+            textAnchor="middle"
+            fill="#a7f3d0"
+            fontSize="10"
+            fontWeight="600"
+            letterSpacing="0.05em"
+            style={{
+              pointerEvents: 'none',
+              userSelect: 'none',
+              textTransform: 'uppercase',
+              textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+            }}
+          >
+            Home System
+          </text>
+        </g>
+      ) : (
+        <g>
+          {/* Background polygon */}
+          <polygon
+            points={hexPoints}
+            fill={fill}
+            stroke={isPending ? 'transparent' : stroke}
+            strokeWidth={strokeWidth}
+            strokeDasharray={strokeDasharray}
+          />
+
+          {/* Tile image if available */}
+          {showImage && (
             <image
               href={`/tiles/ST_${tileId}.png`}
-              x={cx - R}
-              y={cy - H / 2}
+              x={-R}
+              y={-H / 2}
               width={2 * R}
               height={H}
               preserveAspectRatio="xMidYMid slice"
+              clipPath={`url(#${clipId})`}
               onError={() => setImgFailed(true)}
             />
-          </g>
-          <polygon
-            points={hexPoints}
-            fill="none"
-            stroke={stroke}
-            strokeWidth={strokeWidth}
-          />
-        </>
-      )}
+          )}
 
-      {/* Center Label */}
-      {(!showImage || isPlaceholder) && (
-        <g>
-          <text
-            x={cx}
-            y={subLabel ? cy - 2 : cy + 5}
-            textAnchor="middle"
-            fill={isPlaceholder ? '#6b7280' : '#ffffff'}
-            fontSize={isPlaceholder ? '12' : '14'}
-            fontWeight={isPlaceholder ? '500' : '700'}
-            style={{ pointerEvents: 'none', userSelect: 'none' }}
-          >
-            {label || (tileId ? `Tile ${tileId}` : '')}
-          </text>
-          {subLabel && (
-            <text
-              x={cx}
-              y={cy + 15}
-              textAnchor="middle"
-              fill="#9ca3af"
-              fontSize="10"
-              style={{ pointerEvents: 'none', userSelect: 'none' }}
-            >
-              {subLabel}
-            </text>
+          {/* Center Label */}
+          {(!showImage || isPlaceholder) && (
+            <g>
+              <text
+                x={0}
+                y={subLabel ? -2 : 5}
+                textAnchor="middle"
+                fill={isPlaceholder ? '#6b7280' : '#ffffff'}
+                fontSize={isPlaceholder ? '12' : '14'}
+                fontWeight={isPlaceholder ? '500' : '700'}
+                style={{ pointerEvents: 'none', userSelect: 'none' }}
+              >
+                {label || (tileId ? `Tile ${tileId}` : '')}
+              </text>
+              {subLabel && (
+                <text
+                  x={0}
+                  y={15}
+                  textAnchor="middle"
+                  fill="#9ca3af"
+                  fontSize="10"
+                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                >
+                  {subLabel}
+                </text>
+              )}
+            </g>
+          )}
+
+          {/* Top-most Border Polygon ensuring uniform stroke on all sides */}
+          {stroke !== 'none' && (
+            <polygon
+              points={hexPoints}
+              fill="none"
+              stroke={stroke}
+              strokeWidth={strokeWidth}
+            />
+          )}
+
+          {/* Pending inner frame */}
+          {isPending && (
+            <polygon
+              points={getFlatHexPoints(0, 0, R - 6)}
+              fill="none"
+              stroke="#fbbf24"
+              strokeWidth="1.5"
+              strokeDasharray="4 2"
+              strokeOpacity="0.85"
+            />
           )}
         </g>
       )}
@@ -286,8 +316,8 @@ function HomeSystemTileCountBadge({ cx, cy, blueCount = 3, redCount = 2 }) {
   );
 }
 
-export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, onSelectHex, isMyTurn }) {
-  const mecatolTileId = getMecatolTileId(room?.expansions);
+export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, onSelectHex, isMyTurn, onHoverTile }) {
+  const mecatolTileId = getMecatolTileId(room?.settings?.expansions);
   const players = room?.players || [];
   const placedTiles = room?.mapState?.placedTiles || {};
   const activeRing = getCurrentActiveRing(placedTiles, ALL_37_HEXES);
@@ -454,7 +484,9 @@ export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, on
                   subLabel={`Tile ${placed.tileId}`}
                   fill="#181824"
                   stroke="#4f46e5"
-                  strokeWidth={2}
+                  strokeWidth={1}
+                  onMouseEnter={() => onHoverTile && onHoverTile(placed.tileId)}
+                  onMouseLeave={() => onHoverTile && onHoverTile(null)}
                 />
               );
             }
@@ -466,18 +498,18 @@ export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, on
 
             let fill = hex.ring === 1 ? '#141424' : hex.ring === 2 ? '#12121e' : '#10101a';
             let stroke = hex.ring === 1 ? '#4f46e5' : hex.ring === 2 ? '#33334d' : '#272738';
-            let strokeWidth = 1.5;
-            let strokeDasharray = '4 3';
+            let strokeWidth = 1;
+            let strokeDasharray = 'none';
 
             if (isPending) {
-              fill = '#2a2512';
-              stroke = '#fbbf24';
-              strokeWidth = 3;
+              fill = '#36230b';
+              stroke = 'none';
+              strokeWidth = 0;
               strokeDasharray = 'none';
             } else if (isActiveRingHex && isMyTurn && selectedTileId) {
               fill = '#1a1a38';
               stroke = '#60a5fa';
-              strokeWidth = 2.5;
+              strokeWidth = 1;
               strokeDasharray = 'none';
             }
 
@@ -486,15 +518,19 @@ export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, on
                 key={hex.id}
                 cx={rx}
                 cy={ry}
+                tileId={isPending ? selectedTileId : null}
                 label={isPending ? `Tile ${selectedTileId}` : `Ring ${hex.ring}`}
                 subLabel={isPending ? 'Pending placement' : isActiveRingHex ? 'Active Ring' : ''}
                 isPlaceholder={!isPending}
+                isPending={isPending}
                 fill={fill}
                 stroke={stroke}
                 strokeWidth={strokeWidth}
                 strokeDasharray={strokeDasharray}
                 cursor={isClickable ? 'pointer' : 'default'}
                 onClick={() => isClickable && onSelectHex && onSelectHex(hex.id)}
+                onMouseEnter={() => isPending && selectedTileId && onHoverTile && onHoverTile(selectedTileId)}
+                onMouseLeave={() => isPending && onHoverTile && onHoverTile(null)}
               />
             );
           })}

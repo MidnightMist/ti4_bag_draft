@@ -7,7 +7,7 @@ export function getMecatolTileId(expansions = {}) {
 
 // 2. Blue System Tiles
 export const BLUE_TILES_BY_EXPANSION = {
-  base: [18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38],
+  base: [19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38],
   pok: [59, 60, 61, 62, 63, 64, 65, 66, 69, 70, 71, 72, 73, 74, 75, 76],
   thundersEdge: [97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111]
 };
@@ -15,7 +15,7 @@ export const BLUE_TILES_BY_EXPANSION = {
 export const MASTER_BLUE_TILES_TIERS = {
   tier1: [27, 28, 29, 30, 35, 37, 69, 70, 71, 72, 75, 97, 101, 110],
   tier2: [26, 31, 33, 34, 36, 38, 62, 64, 65, 66, 73, 74, 76, 98, 99, 100, 105, 106, 107, 108],
-  tier3: [18, 19, 20, 21, 22, 23, 24, 25, 32, 59, 60, 61, 63, 102, 103, 104, 109, 111]
+  tier3: [19, 20, 21, 22, 23, 24, 25, 32, 59, 60, 61, 63, 102, 103, 104, 109, 111]
 };
 
 export const DEFAULT_BLUE_TILES = MASTER_BLUE_TILES_TIERS;
@@ -229,7 +229,7 @@ export function checkTileViolations(placedTiles = {}, hex, tileId, allHexes = AL
   };
 }
 
-export function validatePlacement(placedTiles = {}, targetHex, tileId, activeRing, allHexes = ALL_37_HEXES) {
+export function validatePlacement(placedTiles = {}, targetHex, tileId, activeRing, allHexes = ALL_37_HEXES, player = null) {
   if (placedTiles[targetHex.id]) {
     return { allowed: false, reason: 'Hex is already occupied' };
   }
@@ -244,30 +244,48 @@ export function validatePlacement(placedTiles = {}, targetHex, tileId, activeRin
     return { allowed: true, forced: false, reason: 'Valid placement' };
   }
 
-  // Check "no other choice" exception
-  const emptyHexesInRing = allHexes.filter(h => {
-    if (h.ring !== activeRing) return false;
-    if (activeRing === 3 && h.type !== 'ring3') return false;
-    return !placedTiles[h.id];
-  });
-
-  let anyLegalHexExists = false;
-  for (const emptyHex of emptyHexesInRing) {
-    const v = checkTileViolations(placedTiles, emptyHex, tileId, allHexes);
-    if (!v.hasViolation) {
-      anyLegalHexExists = true;
-      break;
+  // Forced placement rule:
+  // If the player has any tile in hand that can be placed in targetHex without violation,
+  // then placing a tile with violations is NOT allowed.
+  // Forced placement is only allowed if EVERY tile remaining in the player's hand
+  // also violates the rules when placed in targetHex.
+  let canForce = false;
+  if (player && player.hand) {
+    const handTiles = [...(player.hand.blue || []), ...(player.hand.red || [])];
+    if (handTiles.length > 0) {
+      const anyLegalTileInHand = handTiles.some(t => {
+        const v = checkTileViolations(placedTiles, targetHex, t, allHexes);
+        return !v.hasViolation;
+      });
+      canForce = !anyLegalTileInHand;
     }
+  } else {
+    // Fallback if player not provided: check if any empty hex in ring has no violation for this tile
+    const emptyHexesInRing = allHexes.filter(h => {
+      if (h.ring !== activeRing) return false;
+      if (activeRing === 3 && h.type !== 'ring3') return false;
+      return !placedTiles[h.id];
+    });
+
+    let anyLegalHexExists = false;
+    for (const emptyHex of emptyHexesInRing) {
+      const v = checkTileViolations(placedTiles, emptyHex, tileId, allHexes);
+      if (!v.hasViolation) {
+        anyLegalHexExists = true;
+        break;
+      }
+    }
+    canForce = !anyLegalHexExists;
   }
 
-  if (anyLegalHexExists) {
+  if (!canForce) {
     let reason = 'Cannot place ';
     if (violations.anomalyViolation) reason += 'anomaly adjacent to anomaly';
     else if (violations.alphaViolation) reason += 'Alpha wormhole adjacent to Alpha wormhole';
     else if (violations.betaViolation) reason += 'Beta wormhole adjacent to Beta wormhole';
     return { allowed: false, reason };
   } else {
-    return { allowed: true, forced: true, reason: 'Forced placement (no other choice)' };
+    return { allowed: true, forced: true, reason: 'Forced placement (no legal tiles in hand for this hex)' };
   }
 }
 

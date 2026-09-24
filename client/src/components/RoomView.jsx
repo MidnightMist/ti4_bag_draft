@@ -5,6 +5,7 @@ import { getOrCreateUserId, setActiveUserOverride } from '../utils/userId.js';
 import MapGrid from './MapGrid.jsx';
 import DevToolbar from './DevToolbar.jsx';
 import PlayerHandPanel from './PlayerHandPanel.jsx';
+import TileZoomPreview from './TileZoomPreview.jsx';
 import { getPlayerForTurn, validatePlacement, getCurrentActiveRing, ALL_37_HEXES } from '../data/tileData.js';
 
 export default function RoomView() {
@@ -19,6 +20,7 @@ export default function RoomView() {
   const [copied, setCopied] = useState(false);
   const [selectedTileId, setSelectedTileId] = useState(null);
   const [pendingHexId, setPendingHexId] = useState(null);
+  const [hoveredTileId, setHoveredTileId] = useState(null);
 
   const handleSwitchUser = (newUserId) => {
     setActiveUserOverride(newUserId);
@@ -141,7 +143,7 @@ export default function RoomView() {
   if (selectedTileId && pendingHexId) {
     const targetHex = ALL_37_HEXES.find(h => h.id === pendingHexId);
     if (targetHex) {
-      pendingValidation = validatePlacement(room.mapState?.placedTiles || {}, targetHex, selectedTileId, activeRing, ALL_37_HEXES);
+      pendingValidation = validatePlacement(room.mapState?.placedTiles || {}, targetHex, selectedTileId, activeRing, ALL_37_HEXES, currentTurnPlayer);
     }
   }
 
@@ -567,6 +569,7 @@ export default function RoomView() {
                 }
               }}
               isMyTurn={isMyTurn}
+              onHoverTile={setHoveredTileId}
             />
 
             {/* Placement Action Bar with Accept button */}
@@ -663,10 +666,14 @@ export default function RoomView() {
                   setPendingHexId(null);
                 }
               }}
+              onHoverTile={setHoveredTileId}
             />
           </main>
         </div>
       )}
+
+      {/* Hover Zoom Preview Hint */}
+      <TileZoomPreview tileId={hoveredTileId} />
     </div>
   );
 }

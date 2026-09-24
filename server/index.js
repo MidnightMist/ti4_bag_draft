@@ -368,7 +368,7 @@ io.on('connection', (socket) => {
     }
 
     const activeRing = getCurrentActiveRing(room.mapState.placedTiles, ALL_37_HEXES);
-    const validation = validatePlacement(room.mapState.placedTiles, targetHex, tileNum, activeRing, ALL_37_HEXES);
+    const validation = validatePlacement(room.mapState.placedTiles, targetHex, tileNum, activeRing, ALL_37_HEXES, player);
 
     if (!validation.allowed) {
       socket.emit('room_error', { message: validation.reason || 'Invalid placement' });

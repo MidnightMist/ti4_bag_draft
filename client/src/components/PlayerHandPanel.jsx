@@ -23,7 +23,7 @@ function getHandHexPoints(cx, cy, radius = HAND_R) {
  * - No labels or text captions
  * - Pure hexagon tile artwork with subtle selection state
  */
-function LargeHexTile({ tileId, isSelected, onClick }) {
+function LargeHexTile({ tileId, isSelected, onClick, onMouseEnter, onMouseLeave }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = tileId && !imgFailed;
 
@@ -32,6 +32,8 @@ function LargeHexTile({ tileId, isSelected, onClick }) {
   return (
     <div
       onClick={onClick}
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
       style={{
         display: 'inline-flex',
         flexDirection: 'column',
@@ -133,7 +135,7 @@ function LargeHexTile({ tileId, isSelected, onClick }) {
   );
 }
 
-export default function PlayerHandPanel({ player, activeTileId, onSelectTile }) {
+export default function PlayerHandPanel({ player, activeTileId, onSelectTile, onHoverTile }) {
   const blueTiles = player?.hand?.blue || [];
   const redTiles = player?.hand?.red || [];
 
@@ -198,6 +200,8 @@ export default function PlayerHandPanel({ player, activeTileId, onSelectTile }) 
             tileId={item.tileId}
             isSelected={activeTileId === item.tileId && item.tileId !== null}
             onClick={() => onSelectTile && item.tileId && onSelectTile(item.tileId)}
+            onMouseEnter={() => item.tileId && onHoverTile && onHoverTile(item.tileId)}
+            onMouseLeave={() => onHoverTile && onHoverTile(null)}
           />
         ))}
       </div>
