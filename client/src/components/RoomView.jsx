@@ -516,7 +516,7 @@ export default function RoomView() {
             id="map-main-column"
             style={{
               flex: 1,
-              minWidth: '320px',
+              minWidth: '500px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
@@ -539,7 +539,7 @@ export default function RoomView() {
 }
 
 const roomContainerStyle = {
-  maxWidth: '1440px',
+  maxWidth: '1600px',
   margin: '0 auto',
   padding: '16px',
 };

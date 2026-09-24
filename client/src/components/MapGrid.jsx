@@ -2,8 +2,9 @@ import React, { useState } from 'react';
 import { getMecatolTileId } from '../data/tileData.js';
 
 // Geometry constants for flat-topped hexagonal grid
-const R = 54; // Circumradius (center to vertex)
-const H = Math.sqrt(3) * R; // Height of flat-topped hex (~93.53px)
+// Radius enlarged from 54 to 62 for maximum board presence
+const R = 62; // Circumradius (center to vertex)
+const H = Math.sqrt(3) * R; // Height of flat-topped hex (~107.39px)
 
 /**
  * Generate standard flat-topped hex polygon points string centered at (cx, cy)
@@ -23,7 +24,7 @@ function getFlatHexPoints(cx, cy, radius = R) {
 /**
  * Generate standard mini flat-topped hex polygon points
  */
-function getMiniHexPoints(cx, cy, radius = 13) {
+function getMiniHexPoints(cx, cy, radius = 14) {
   const h = Math.sqrt(3) * radius;
   return [
     `${cx - radius},${cy}`,
@@ -186,11 +187,11 @@ function HexTile({
         {/* Glow if viewer */}
         {isViewer && (
           <polygon
-            points={getFlatHexPoints(cx, cy, R + 4)}
+            points={getFlatHexPoints(cx, cy, R + 5)}
             fill="none"
             stroke="#34d399"
-            strokeWidth="3"
-            strokeOpacity="0.5"
+            strokeWidth="3.5"
+            strokeOpacity="0.55"
           />
         )}
 
@@ -199,7 +200,7 @@ function HexTile({
           points={hexPoints}
           fill="url(#green-home-system-grad)"
           stroke={isViewer ? '#34d399' : '#059669'}
-          strokeWidth={isViewer ? 2.5 : 2}
+          strokeWidth={isViewer ? 3 : 2}
         />
 
         {/* Inner subtle border accent */}
@@ -216,9 +217,9 @@ function HexTile({
         {isSpeaker && (
           <text
             x={cx}
-            y={cy - 22}
+            y={cy - 24}
             textAnchor="middle"
-            fontSize="14"
+            fontSize="16"
             style={{ pointerEvents: 'none', userSelect: 'none' }}
           >
             👑
@@ -227,9 +228,9 @@ function HexTile({
 
         {/* "YOU" badge if viewer */}
         {isViewer && !isSpeaker && (
-          <g transform={`translate(${cx}, ${cy - 24})`}>
-            <rect x="-18" y="-8" width="36" height="15" rx="4" fill="#047857" stroke="#34d399" strokeWidth="1" />
-            <text x="0" y="3" textAnchor="middle" fill="#ecfdf5" fontSize="9" fontWeight="bold">
+          <g transform={`translate(${cx}, ${cy - 27})`}>
+            <rect x="-20" y="-9" width="40" height="17" rx="4" fill="#047857" stroke="#34d399" strokeWidth="1" />
+            <text x="0" y="3" textAnchor="middle" fill="#ecfdf5" fontSize="10" fontWeight="bold">
               YOU
             </text>
           </g>
@@ -238,15 +239,15 @@ function HexTile({
         {/* Player Name */}
         <text
           x={cx}
-          y={cy - 2}
+          y={cy}
           textAnchor="middle"
           fill="#ffffff"
-          fontSize="13"
+          fontSize="14"
           fontWeight="700"
           style={{
             pointerEvents: 'none',
             userSelect: 'none',
-            textShadow: '0 2px 4px rgba(0,0,0,0.9)',
+            textShadow: '0 2px 4px rgba(0,0,0,0.95)',
           }}
         >
           {playerName || label}
@@ -255,10 +256,10 @@ function HexTile({
         {/* Subtitle "HOME SYSTEM" */}
         <text
           x={cx}
-          y={cy + 16}
+          y={cy + 19}
           textAnchor="middle"
           fill="#a7f3d0"
-          fontSize="9.5"
+          fontSize="10"
           fontWeight="600"
           letterSpacing="0.05em"
           style={{
@@ -313,10 +314,10 @@ function HexTile({
         <g>
           <text
             x={cx}
-            y={subLabel ? cy - 2 : cy + 4}
+            y={subLabel ? cy - 2 : cy + 5}
             textAnchor="middle"
             fill={isPlaceholder ? '#6b7280' : '#ffffff'}
-            fontSize={isPlaceholder ? '11' : '13'}
+            fontSize={isPlaceholder ? '12' : '14'}
             fontWeight={isPlaceholder ? '500' : '700'}
             style={{ pointerEvents: 'none', userSelect: 'none' }}
           >
@@ -325,10 +326,10 @@ function HexTile({
           {subLabel && (
             <text
               x={cx}
-              y={cy + 13}
+              y={cy + 15}
               textAnchor="middle"
               fill="#9ca3af"
-              fontSize="9"
+              fontSize="10"
               style={{ pointerEvents: 'none', userSelect: 'none' }}
             >
               {subLabel}
@@ -350,7 +351,7 @@ function HomeSystemTileCountBadge({ cx, cy, blueCount = 3, redCount = 2 }) {
   const uy = dist > 0 ? cy / dist : 1;
 
   // Position badge cluster outward from the hex corner
-  const badgeDist = dist + R + 20;
+  const badgeDist = dist + R + 22;
   const bx = ux * badgeDist;
   const by = uy * badgeDist;
 
@@ -359,7 +360,7 @@ function HomeSystemTileCountBadge({ cx, cy, blueCount = 3, redCount = 2 }) {
   const ty = ux;
 
   // Offsets for the two mini hexes
-  const offset = 18;
+  const offset = 20;
   const blueX = bx - tx * offset;
   const blueY = by - ty * offset;
   const redX = bx + tx * offset;
@@ -370,17 +371,17 @@ function HomeSystemTileCountBadge({ cx, cy, blueCount = 3, redCount = 2 }) {
       {/* Blue Mini-Hexagon */}
       <g>
         <polygon
-          points={getMiniHexPoints(blueX, blueY, 13)}
+          points={getMiniHexPoints(blueX, blueY, 15)}
           fill="#1e3a8a"
           stroke="#60a5fa"
           strokeWidth="1.5"
         />
         <text
           x={blueX}
-          y={blueY + 4}
+          y={blueY + 5}
           textAnchor="middle"
           fill="#ffffff"
-          fontSize="11"
+          fontSize="12"
           fontWeight="bold"
         >
           {blueCount}
@@ -390,17 +391,17 @@ function HomeSystemTileCountBadge({ cx, cy, blueCount = 3, redCount = 2 }) {
       {/* Red Mini-Hexagon */}
       <g>
         <polygon
-          points={getMiniHexPoints(redX, redY, 13)}
+          points={getMiniHexPoints(redX, redY, 15)}
           fill="#991b1b"
           stroke="#f87171"
           strokeWidth="1.5"
         />
         <text
           x={redX}
-          y={redY + 4}
+          y={redY + 5}
           textAnchor="middle"
           fill="#ffffff"
-          fontSize="11"
+          fontSize="12"
           fontWeight="bold"
         >
           {redCount}
@@ -415,7 +416,6 @@ export default function MapGrid({ room, mySlot }) {
 
   // Rotation logic:
   // We want the viewing player's home system to be at the BOTTOM (South, d = 0).
-  // Viewer's slotIndex:
   const viewerSlotId = mySlot ? mySlot.slotId : 0;
   // Rotation angle theta = -viewerSlotId * 60 degrees (-viewerSlotId * PI / 3)
   const theta = -viewerSlotId * (Math.PI / 3);
@@ -430,7 +430,7 @@ export default function MapGrid({ room, mySlot }) {
       id="map-grid-container"
       style={{
         width: '100%',
-        maxWidth: '780px',
+        maxWidth: '920px',
         backgroundColor: '#11111b',
         border: '1px solid #272738',
         borderRadius: '16px',
@@ -486,10 +486,10 @@ export default function MapGrid({ room, mySlot }) {
         }}
       >
         <svg
-          viewBox="-400 -400 800 800"
+          viewBox="-440 -440 880 880"
           style={{
             width: '100%',
-            maxWidth: '740px',
+            maxWidth: '880px',
             height: 'auto',
             aspectRatio: '1 / 1',
             display: 'block',
@@ -510,7 +510,7 @@ export default function MapGrid({ room, mySlot }) {
               <stop offset="100%" stopColor="#2e1065" />
             </radialGradient>
 
-            {/* Flat Hex Clip Path for Mecatol image */}
+            {/* Flat Hex Clip Path for tile images */}
             <clipPath id="hex-clip-shape">
               <polygon points={getFlatHexPoints(0, 0, R)} />
             </clipPath>
