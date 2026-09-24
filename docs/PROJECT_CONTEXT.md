@@ -48,9 +48,9 @@
   - Once claimed, the slot is locked to that user's ID and highlighted in blue. Other players see it as "Claimed".
   - A player can unclaim/release their slot if needed.
 - **Transition Trigger:**
-  - When all `N` players claim their slots, the room state transitions from `"lobby"` to active map creation.
-  - Speaker is randomly selected from claimed players.
-  - Player seating arrangement around the table is assigned.
+  - When all `N` players claim their slots, the room state transitions from `"lobby"` to active map creation (`map_building`).
+  - **Randomized Speaker & Seating:** Speaker is randomly selected from claimed players, and players are simultaneously seated in a random order around the table (rather than sequential slot order).
+  - Reverting back to lobby (reset or unclaim) restores the sorted slot order.
 
 ### Phase 2.1: Developer & Testing Toolbar (`DevToolbar.jsx`)
 - **Single-Seat Quick Testing:**

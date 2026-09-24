@@ -414,16 +414,17 @@ function HomeSystemTileCountBadge({ cx, cy, blueCount = 3, redCount = 2 }) {
 export default function MapGrid({ room, mySlot }) {
   const mecatolTileId = getMecatolTileId(room?.expansions);
 
-  // Rotation logic:
-  // We want the viewing player's home system to be at the BOTTOM (South, d = 0).
-  const viewerSlotId = mySlot ? mySlot.slotId : 0;
-  // Rotation angle theta = -viewerSlotId * 60 degrees (-viewerSlotId * PI / 3)
-  const theta = -viewerSlotId * (Math.PI / 3);
-  const cosT = Math.cos(theta);
-  const sinT = Math.sin(theta);
-
   // Map player seats (0..5)
   const players = room?.players || [];
+
+  // Rotation logic:
+  // We want the viewing player's home system to be at the BOTTOM (South, d = 0).
+  const viewerSeatIndex = mySlot ? players.findIndex(p => p.slotId === mySlot.slotId) : 0;
+  const activeViewerSeat = viewerSeatIndex >= 0 ? viewerSeatIndex : 0;
+  // Rotation angle theta = -activeViewerSeat * 60 degrees (-activeViewerSeat * PI / 3)
+  const theta = -activeViewerSeat * (Math.PI / 3);
+  const cosT = Math.cos(theta);
+  const sinT = Math.sin(theta);
 
   return (
     <div

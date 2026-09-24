@@ -31,6 +31,43 @@ function generateRoomId() {
 }
 
 /**
+ * Shuffle helper (Fisher-Yates)
+ */
+function shuffle(array) {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+/**
+ * Transition room to map_building: randomize player seating order, pick random speaker, deal hands.
+ */
+function startMapBuilding(room) {
+  room.status = 'map_building';
+  
+  // Pick random speaker among all players
+  const speakerIndex = Math.floor(Math.random() * room.players.length);
+  const speakerPlayer = room.players[speakerIndex];
+
+  // Randomize seating order of other players relative to each other
+  const otherPlayers = room.players.filter((_, idx) => idx !== speakerIndex);
+  const shuffledOthers = shuffle(otherPlayers);
+
+  // Speaker is first (index 0), followed by randomly ordered other players
+  room.players = [speakerPlayer, ...shuffledOthers];
+
+  // Assign speaker flag and mapState speakerSlotId
+  room.players.forEach((p, idx) => {
+    p.isSpeaker = (idx === 0);
+  });
+  room.mapState.speakerSlotId = room.players[0].slotId;
+  dealPlayerHands(room);
+}
+
+/**
  * Deal 3 Blue and 2 Red tiles to each player in the room.
  * Balanced mode: 1 Tier 1 + 1 Tier 2 + 1 Tier 3 blue tiles, plus 2 red tiles.
  * Random mode: 3 random blue tiles + 2 red tiles.
@@ -40,16 +77,6 @@ function dealPlayerHands(room) {
   const expansions = room.settings.expansions;
   const mecatolId = getMecatolTileId(expansions);
   const isBalanced = room.settings.tileMode === 'balanced';
-
-  // Shuffle helper (Fisher-Yates)
-  const shuffle = (array) => {
-    const arr = [...array];
-    for (let i = arr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [arr[i], arr[j]] = [arr[j], arr[i]];
-    }
-    return arr;
-  };
 
   // Red tiles pool (excluding any invalid)
   const redPool = shuffle(getActiveRedTiles(expansions));
@@ -237,14 +264,7 @@ io.on('connection', (socket) => {
     // Check if all players are claimed
     const allClaimed = room.players.every(p => p.claimedBy !== null);
     if (allClaimed && room.status === 'lobby') {
-      room.status = 'map_building';
-      // Pick random speaker
-      const randomSpeakerIndex = Math.floor(Math.random() * room.players.length);
-      room.players.forEach((p, idx) => {
-        p.isSpeaker = idx === randomSpeakerIndex;
-      });
-      room.mapState.speakerSlotId = room.players[randomSpeakerIndex].slotId;
-      dealPlayerHands(room);
+      startMapBuilding(room);
     }
 
     io.to(roomId).emit('room_state', room);
@@ -261,6 +281,7 @@ io.on('connection', (socket) => {
       slot.claimedAt = null;
       if (room.status === 'map_building') {
         room.status = 'lobby';
+        room.players.sort((a, b) => a.slotId - b.slotId);
       }
       io.to(roomId).emit('room_state', room);
     }
@@ -304,13 +325,7 @@ io.on('connection', (socket) => {
 
     const allClaimed = room.players.every(p => p.claimedBy !== null);
     if (allClaimed && room.status === 'lobby') {
-      room.status = 'map_building';
-      const randomSpeakerIndex = Math.floor(Math.random() * room.players.length);
-      room.players.forEach((p, idx) => {
-        p.isSpeaker = idx === randomSpeakerIndex;
-      });
-      room.mapState.speakerSlotId = room.players[randomSpeakerIndex].slotId;
-      dealPlayerHands(room);
+      startMapBuilding(room);
     }
 
     io.to(roomId).emit('room_state', room);
@@ -330,6 +345,7 @@ io.on('connection', (socket) => {
       p.remainingBlue = 3;
       p.remainingRed = 2;
     });
+    room.players.sort((a, b) => a.slotId - b.slotId);
     room.mapState = {
       placedTiles: {},
       speakerSlotId: null
