@@ -208,3 +208,22 @@
   }
   ```
 
+---
+
+## 7. Tile Placement Logic & Adjacency Rules
+
+1. **Ring Order & Progression:**
+   - Ring 1 (6 hexes surrounding Mecatol Rex) must be fully filled before any hex in Ring 2 can be placed.
+   - Ring 2 (12 hexes) must be fully filled before any edge hex in Ring 3 can be placed.
+2. **Adjacency Constraints:**
+   - Anomaly tiles cannot be placed adjacent to other anomaly tiles.
+   - Alpha wormhole tiles cannot be placed adjacent to Alpha wormholes.
+   - Beta wormhole tiles cannot be placed adjacent to Beta wormholes.
+3. **"No Other Choice" Exception ("Forced Placement"):**
+   - If placing a tile on an available hex in the active ring violates an adjacency rule, the placement is permitted if and only if *every* available empty hex in the current active ring would also violate the adjacency rule (i.e. no legal placement exists without violation).
+4. **Placement Workflow:**
+   - Active player selects a tile from hand (`PlayerHandPanel`). Temporary debug labels beneath hand tiles show Anomaly and Wormhole parameters.
+   - Player clicks an eligible empty hex in the active ring (`MapGrid`).
+   - An **Accept** button appears in the placement action bar alongside real-time validation feedback.
+   - Clicking **Accept** confirms the choice (`place_tile` socket event), places the tile on the board, removes it from the player's hand, and advances the turn in snake order.
+

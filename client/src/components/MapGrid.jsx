@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getMecatolTileId } from '../data/tileData.js';
+import { getMecatolTileId, getCurrentActiveRing, ALL_37_HEXES } from '../data/tileData.js';
 
 // Geometry constants for flat-topped hexagonal grid
 // Radius enlarged from 54 to 62 for maximum board presence
@@ -37,127 +37,6 @@ function getMiniHexPoints(cx, cy, radius = 14) {
 }
 
 /**
- * Base directions from center (0,0) for flat-topped hex grid in clockwise order:
- * d = 0: South (Bottom)
- * d = 1: South-West (Lower-Left)
- * d = 2: North-West (Upper-Left)
- * d = 3: North (Top)
- * d = 4: North-East (Upper-Right)
- * d = 5: South-East (Lower-Right)
- */
-const BASE_DIRECTIONS = [
-  { x: 0, y: H },              // 0: South (+y)
-  { x: -1.5 * R, y: 0.5 * H },  // 1: South-West
-  { x: -1.5 * R, y: -0.5 * H }, // 2: North-West
-  { x: 0, y: -H },             // 3: North (-y)
-  { x: 1.5 * R, y: -0.5 * H },  // 4: North-East
-  { x: 1.5 * R, y: 0.5 * H },   // 5: South-East
-];
-
-/**
- * Build all 37 hex positions for the 3-ring TI4 map (Ring 0, 1, 2, 3)
- */
-function generate37Hexes() {
-  const hexes = [];
-
-  // 1. Ring 0: Center (Mecatol Rex)
-  hexes.push({
-    id: 'center',
-    ring: 0,
-    index: 0,
-    type: 'center',
-    x: 0,
-    y: 0,
-  });
-
-  // 2. Ring 1: 6 hexes
-  for (let d = 0; d < 6; d++) {
-    hexes.push({
-      id: `ring1-${d}`,
-      ring: 1,
-      index: d,
-      type: 'ring1',
-      x: BASE_DIRECTIONS[d].x,
-      y: BASE_DIRECTIONS[d].y,
-    });
-  }
-
-  // 3. Ring 2: 12 hexes (6 corners + 6 midpoints)
-  for (let d = 0; d < 6; d++) {
-    const nextD = (d + 1) % 6;
-    const cX = BASE_DIRECTIONS[d].x * 2;
-    const cY = BASE_DIRECTIONS[d].y * 2;
-    // Corner hex
-    hexes.push({
-      id: `ring2-corner-${d}`,
-      ring: 2,
-      index: d * 2,
-      type: 'ring2',
-      x: cX,
-      y: cY,
-    });
-
-    // Edge midpoint hex
-    const nextCX = BASE_DIRECTIONS[nextD].x * 2;
-    const nextCY = BASE_DIRECTIONS[nextD].y * 2;
-    hexes.push({
-      id: `ring2-edge-${d}`,
-      ring: 2,
-      index: d * 2 + 1,
-      type: 'ring2',
-      x: (cX + nextCX) / 2,
-      y: (cY + nextCY) / 2,
-    });
-  }
-
-  // 4. Ring 3: 18 hexes (6 Home Systems at corners + 12 edge hexes)
-  for (let d = 0; d < 6; d++) {
-    const nextD = (d + 1) % 6;
-    const cX = BASE_DIRECTIONS[d].x * 3;
-    const cY = BASE_DIRECTIONS[d].y * 3;
-
-    // Corner: Home System for seat d
-    hexes.push({
-      id: `home-system-${d}`,
-      ring: 3,
-      index: d,
-      type: 'home_system',
-      seatIndex: d,
-      x: cX,
-      y: cY,
-    });
-
-    // 2 intermediate edge hexes along this side
-    const nextCX = BASE_DIRECTIONS[nextD].x * 3;
-    const nextCY = BASE_DIRECTIONS[nextD].y * 3;
-    const dx = (nextCX - cX) / 3;
-    const dy = (nextCY - cY) / 3;
-
-    hexes.push({
-      id: `ring3-edge-${d}-1`,
-      ring: 3,
-      index: 6 + d * 2,
-      type: 'ring3',
-      x: cX + dx,
-      y: cY + dy,
-    });
-
-    hexes.push({
-      id: `ring3-edge-${d}-2`,
-      ring: 3,
-      index: 6 + d * 2 + 1,
-      type: 'ring3',
-      x: cX + dx * 2,
-      y: cY + dy * 2,
-    });
-  }
-
-  return hexes;
-}
-
-const ALL_37_HEXES = generate37Hexes();
-
-/**
  * Standard Hex Tile Renderer
  */
 function HexTile({
@@ -175,6 +54,8 @@ function HexTile({
   playerName = '',
   isViewer = false,
   isSpeaker = false,
+  onClick,
+  cursor = 'default',
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = tileId && !imgFailed;
@@ -183,7 +64,7 @@ function HexTile({
   // Home System Green Styling
   if (isHomeSystem) {
     return (
-      <g className="home-system-tile" style={{ cursor: 'pointer' }}>
+      <g className="home-system-tile" style={{ cursor: 'pointer' }} onClick={onClick}>
         {/* Glow if viewer */}
         {isViewer && (
           <polygon
@@ -276,7 +157,7 @@ function HexTile({
   }
 
   return (
-    <g className="map-hex-tile">
+    <g className="map-hex-tile" onClick={onClick} style={{ cursor }}>
       {/* Background polygon */}
       <polygon
         points={hexPoints}
@@ -345,21 +226,17 @@ function HexTile({
  * Mini Hexagons Badge for remaining Blue & Red tiles beside a Home System
  */
 function HomeSystemTileCountBadge({ cx, cy, blueCount = 3, redCount = 2 }) {
-  // Center of badge is radially outward from (0,0) through (cx, cy)
   const dist = Math.sqrt(cx * cx + cy * cy);
   const ux = dist > 0 ? cx / dist : 0;
   const uy = dist > 0 ? cy / dist : 1;
 
-  // Position badge cluster outward from the hex corner
   const badgeDist = dist + R + 22;
   const bx = ux * badgeDist;
   const by = uy * badgeDist;
 
-  // Tangent vector for placing blue and red side-by-side
   const tx = -uy;
   const ty = ux;
 
-  // Offsets for the two mini hexes
   const offset = 20;
   const blueX = bx - tx * offset;
   const blueY = by - ty * offset;
@@ -368,7 +245,6 @@ function HomeSystemTileCountBadge({ cx, cy, blueCount = 3, redCount = 2 }) {
 
   return (
     <g className="tile-count-badge" style={{ pointerEvents: 'none', userSelect: 'none' }}>
-      {/* Blue Mini-Hexagon */}
       <g>
         <polygon
           points={getMiniHexPoints(blueX, blueY, 15)}
@@ -388,7 +264,6 @@ function HomeSystemTileCountBadge({ cx, cy, blueCount = 3, redCount = 2 }) {
         </text>
       </g>
 
-      {/* Red Mini-Hexagon */}
       <g>
         <polygon
           points={getMiniHexPoints(redX, redY, 15)}
@@ -411,17 +286,15 @@ function HomeSystemTileCountBadge({ cx, cy, blueCount = 3, redCount = 2 }) {
   );
 }
 
-export default function MapGrid({ room, mySlot }) {
+export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, onSelectHex, isMyTurn }) {
   const mecatolTileId = getMecatolTileId(room?.expansions);
-
-  // Map player seats (0..5)
   const players = room?.players || [];
+  const placedTiles = room?.mapState?.placedTiles || {};
+  const activeRing = getCurrentActiveRing(placedTiles, ALL_37_HEXES);
 
-  // Rotation logic:
-  // We want the viewing player's home system to be at the BOTTOM (South, d = 0).
+  // Rotation logic: viewer home system at bottom (South, d=0)
   const viewerSeatIndex = mySlot ? players.findIndex(p => p.slotId === mySlot.slotId) : 0;
   const activeViewerSeat = viewerSeatIndex >= 0 ? viewerSeatIndex : 0;
-  // Rotation angle theta = -activeViewerSeat * 60 degrees (-activeViewerSeat * PI / 3)
   const theta = -activeViewerSeat * (Math.PI / 3);
   const cosT = Math.cos(theta);
   const sinT = Math.sin(theta);
@@ -456,7 +329,7 @@ export default function MapGrid({ room, mySlot }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '18px' }}>🌌</span>
           <h3 style={{ margin: 0, fontSize: '18px', color: '#f3f4f6', fontWeight: '700' }}>
-            Twilight Galaxy (3 Rings • 6 Players)
+            Twilight Galaxy (Active Ring: {activeRing})
           </h3>
         </div>
 
@@ -497,21 +370,18 @@ export default function MapGrid({ room, mySlot }) {
           }}
         >
           <defs>
-            {/* Emerald Green gradient for Home Systems */}
             <radialGradient id="green-home-system-grad" cx="50%" cy="50%" r="65%">
               <stop offset="0%" stopColor="#059669" />
               <stop offset="70%" stopColor="#047857" />
               <stop offset="100%" stopColor="#064e3b" />
             </radialGradient>
 
-            {/* Mecatol Rex Purple gradient */}
             <radialGradient id="mecatol-grad" cx="50%" cy="50%" r="65%">
               <stop offset="0%" stopColor="#581c87" />
               <stop offset="75%" stopColor="#3b0764" />
               <stop offset="100%" stopColor="#2e1065" />
             </radialGradient>
 
-            {/* Flat Hex Clip Path for tile images */}
             <clipPath id="hex-clip-shape">
               <polygon points={getFlatHexPoints(0, 0, R)} />
             </clipPath>
@@ -524,14 +394,10 @@ export default function MapGrid({ room, mySlot }) {
 
           {/* Render All 37 Hexes */}
           {ALL_37_HEXES.map((hex) => {
-            // Apply view rotation theta:
-            // rx = x * cos(theta) - y * sin(theta)
-            // ry = x * sin(theta) + y * cos(theta)
             const rx = hex.x * cosT - hex.y * sinT;
             const ry = hex.x * sinT + hex.y * cosT;
 
             if (hex.type === 'center') {
-              // Mecatol Rex
               return (
                 <HexTile
                   key={hex.id}
@@ -548,7 +414,6 @@ export default function MapGrid({ room, mySlot }) {
             }
 
             if (hex.type === 'home_system') {
-              // Home system at base seat index hex.seatIndex
               const player = players[hex.seatIndex] || {
                 name: `Player ${hex.seatIndex + 1}`,
                 slotId: hex.seatIndex,
@@ -567,8 +432,6 @@ export default function MapGrid({ room, mySlot }) {
                     isViewer={isViewer}
                     isSpeaker={!!player.isSpeaker}
                   />
-
-                  {/* Tile count badge: Two mini-hexagons (blue & red) */}
                   <HomeSystemTileCountBadge
                     cx={rx}
                     cy={ry}
@@ -579,25 +442,59 @@ export default function MapGrid({ room, mySlot }) {
               );
             }
 
-            // Normal Empty Hex Slots (Ring 1, 2, 3)
-            const ringColor =
-              hex.ring === 1
-                ? { stroke: '#4f46e5', fill: '#141424', label: 'Ring 1' }
-                : hex.ring === 2
-                ? { stroke: '#33334d', fill: '#12121e', label: 'Ring 2' }
-                : { stroke: '#272738', fill: '#10101a', label: 'Ring 3' };
+            // Check if placed tile exists
+            const placed = placedTiles[hex.id];
+            if (placed) {
+              return (
+                <HexTile
+                  key={hex.id}
+                  cx={rx}
+                  cy={ry}
+                  tileId={placed.tileId}
+                  subLabel={`Tile ${placed.tileId}`}
+                  fill="#181824"
+                  stroke="#4f46e5"
+                  strokeWidth={2}
+                />
+              );
+            }
+
+            // Empty Hex Slot
+            const isActiveRingHex = hex.ring === activeRing && (hex.ring !== 3 || hex.type === 'ring3');
+            const isPending = pendingHexId === hex.id;
+            const isClickable = isMyTurn && selectedTileId && isActiveRingHex;
+
+            let fill = hex.ring === 1 ? '#141424' : hex.ring === 2 ? '#12121e' : '#10101a';
+            let stroke = hex.ring === 1 ? '#4f46e5' : hex.ring === 2 ? '#33334d' : '#272738';
+            let strokeWidth = 1.5;
+            let strokeDasharray = '4 3';
+
+            if (isPending) {
+              fill = '#2a2512';
+              stroke = '#fbbf24';
+              strokeWidth = 3;
+              strokeDasharray = 'none';
+            } else if (isActiveRingHex && isMyTurn && selectedTileId) {
+              fill = '#1a1a38';
+              stroke = '#60a5fa';
+              strokeWidth = 2.5;
+              strokeDasharray = 'none';
+            }
 
             return (
               <HexTile
                 key={hex.id}
                 cx={rx}
                 cy={ry}
-                label={ringColor.label}
-                isPlaceholder={true}
-                fill={ringColor.fill}
-                stroke={ringColor.stroke}
-                strokeWidth={1.5}
-                strokeDasharray="4 3"
+                label={isPending ? `Tile ${selectedTileId}` : `Ring ${hex.ring}`}
+                subLabel={isPending ? 'Pending placement' : isActiveRingHex ? 'Active Ring' : ''}
+                isPlaceholder={!isPending}
+                fill={fill}
+                stroke={stroke}
+                strokeWidth={strokeWidth}
+                strokeDasharray={strokeDasharray}
+                cursor={isClickable ? 'pointer' : 'default'}
+                onClick={() => isClickable && onSelectHex && onSelectHex(hex.id)}
               />
             );
           })}
@@ -606,7 +503,9 @@ export default function MapGrid({ room, mySlot }) {
 
       {/* Board Guide Note */}
       <div style={{ marginTop: '6px', fontSize: '11px', color: '#6b7280', textAlign: 'center' }}>
-        Green tiles: Home Systems • Blue/Red badges: Remaining tiles in hand
+        {isMyTurn && selectedTileId
+          ? 'Click an active ring hex to place your selected tile, then click Accept.'
+          : 'Green tiles: Home Systems • Blue/Red badges: Remaining tiles in hand'}
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { getOrCreateUserId, setActiveUserOverride } from '../utils/userId.js';
 import MapGrid from './MapGrid.jsx';
 import DevToolbar from './DevToolbar.jsx';
 import PlayerHandPanel from './PlayerHandPanel.jsx';
+import { getPlayerForTurn, validatePlacement, getCurrentActiveRing, ALL_37_HEXES } from '../data/tileData.js';
 
 export default function RoomView() {
   const { roomId } = useParams();
@@ -17,6 +18,7 @@ export default function RoomView() {
   const [socket, setSocket] = useState(null);
   const [copied, setCopied] = useState(false);
   const [selectedTileId, setSelectedTileId] = useState(null);
+  const [pendingHexId, setPendingHexId] = useState(null);
 
   const handleSwitchUser = (newUserId) => {
     setActiveUserOverride(newUserId);
@@ -127,6 +129,34 @@ export default function RoomView() {
   const claimedCount = room.players.filter((p) => p.claimedBy !== null).length;
   const isLobby = room.status === 'lobby';
   const speaker = room.players.find((p) => p.isSpeaker);
+
+  // Turn calculation
+  const currentTurnIndex = room.mapState?.currentTurnIndex || 0;
+  const currentTurnPlayer = getPlayerForTurn(room.players, currentTurnIndex);
+  const isMyTurn = myClaimedSlot && currentTurnPlayer && currentTurnPlayer.slotId === myClaimedSlot.slotId;
+  const activeRing = getCurrentActiveRing(room.mapState?.placedTiles || {}, ALL_37_HEXES);
+
+  // Validate pending placement if tile and hex selected
+  let pendingValidation = null;
+  if (selectedTileId && pendingHexId) {
+    const targetHex = ALL_37_HEXES.find(h => h.id === pendingHexId);
+    if (targetHex) {
+      pendingValidation = validatePlacement(room.mapState?.placedTiles || {}, targetHex, selectedTileId, activeRing, ALL_37_HEXES);
+    }
+  }
+
+  const handleAcceptPlacement = () => {
+    if (!socket || !myClaimedSlot || !selectedTileId || !pendingHexId) return;
+    socket.emit('place_tile', {
+      roomId,
+      slotId: myClaimedSlot.slotId,
+      tileId: selectedTileId,
+      hexId: pendingHexId
+    });
+    // Reset selection locally upon sending
+    setSelectedTileId(null);
+    setPendingHexId(null);
+  };
 
   return (
     <div id="room-page" style={roomContainerStyle}>
@@ -375,6 +405,9 @@ export default function RoomView() {
                   <div style={{ color: '#d1fae5', fontSize: '12px', marginTop: '2px' }}>
                     Speaker: <strong style={{ color: '#fbbf24' }}>👑 {speaker?.name || 'Player 1'}</strong>
                   </div>
+                  <div style={{ color: '#fbbf24', fontSize: '12px', marginTop: '4px' }}>
+                    Turn: <strong>{currentTurnPlayer?.name || 'Player 1'}</strong> {isMyTurn ? '(Your Turn!)' : ''}
+                  </div>
                 </div>
               </div>
 
@@ -522,14 +555,114 @@ export default function RoomView() {
               alignItems: 'center',
             }}
           >
-            {/* The Big 3-Ring Hexagonal Board (Mecatol + 3 rings with green Home Systems rotated to viewer) */}
-            <MapGrid room={room} mySlot={myClaimedSlot} />
+            {/* The Big 3-Ring Hexagonal Board */}
+            <MapGrid
+              room={room}
+              mySlot={myClaimedSlot}
+              selectedTileId={selectedTileId}
+              pendingHexId={pendingHexId}
+              onSelectHex={(hexId) => {
+                if (isMyTurn && selectedTileId) {
+                  setPendingHexId(hexId);
+                }
+              }}
+              isMyTurn={isMyTurn}
+            />
 
-            {/* Row of 5 Tiles at the bottom (reserved space for player hand) */}
+            {/* Placement Action Bar with Accept button */}
+            {selectedTileId && isMyTurn && (
+              <div
+                style={{
+                  marginTop: '14px',
+                  width: '100%',
+                  maxWidth: '920px',
+                  backgroundColor: '#1b1b2f',
+                  border: '1px solid #3b82f6',
+                  borderRadius: '12px',
+                  padding: '14px 20px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  boxShadow: '0 4px 20px rgba(59, 130, 246, 0.25)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '20px' }}>📦</span>
+                  <div>
+                    <div style={{ color: '#93c5fd', fontWeight: '700', fontSize: '13px' }}>
+                      Selected Tile: #{selectedTileId}
+                    </div>
+                    <div style={{ color: '#d1d5db', fontSize: '12px', marginTop: '2px' }}>
+                      {pendingHexId ? (
+                        <span>
+                          Target Hex: <strong style={{ color: '#fbbf24' }}>{pendingHexId}</strong>{' '}
+                          {pendingValidation && (
+                            <span style={{ color: pendingValidation.allowed ? '#34d399' : '#ef4444', marginLeft: '8px', fontWeight: '600' }}>
+                              ({pendingValidation.reason})
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span style={{ color: '#9ca3af' }}>
+                          Click an empty hex in <strong>Ring {activeRing}</strong> on the map
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                  <button
+                    onClick={() => { setSelectedTileId(null); setPendingHexId(null); }}
+                    style={{
+                      backgroundColor: '#374151',
+                      color: '#d1d5db',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '8px 14px',
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                    }}
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    id="accept-tile-placement-btn"
+                    disabled={!pendingHexId || !pendingValidation?.allowed}
+                    onClick={handleAcceptPlacement}
+                    style={{
+                      backgroundColor: pendingHexId && pendingValidation?.allowed ? '#059669' : '#374151',
+                      color: pendingHexId && pendingValidation?.allowed ? '#fff' : '#9ca3af',
+                      border: 'none',
+                      borderRadius: '6px',
+                      padding: '8px 20px',
+                      fontSize: '13px',
+                      cursor: pendingHexId && pendingValidation?.allowed ? 'pointer' : 'not-allowed',
+                      fontWeight: '700',
+                      boxShadow: pendingHexId && pendingValidation?.allowed ? '0 0 10px rgba(5, 150, 105, 0.4)' : 'none',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    Accept
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Row of 5 Tiles at the bottom (player hand) */}
             <PlayerHandPanel
               player={myClaimedSlot}
               activeTileId={selectedTileId}
-              onSelectTile={(tileId) => setSelectedTileId(tileId)}
+              onSelectTile={(tileId) => {
+                if (isMyTurn) {
+                  setSelectedTileId(tileId);
+                  setPendingHexId(null);
+                }
+              }}
             />
           </main>
         </div>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { isAnomaly, getWormholeType } from '../data/tileData.js';
 
 // Tile radius for bottom hand tiles: enlarged to R = 64 (width ~128px, height ~110px)
 const HAND_R = 64;
@@ -106,6 +107,28 @@ function LargeHexTile({ tileId, isSelected, onClick }) {
           </text>
         )}
       </svg>
+
+      {/* Temporary Debug Labels below tile */}
+      {tileId && (
+        <div
+          style={{
+            marginTop: '6px',
+            fontSize: '10px',
+            color: '#9ca3af',
+            textAlign: 'center',
+            fontFamily: 'monospace',
+            lineHeight: '1.2',
+            backgroundColor: '#181824',
+            padding: '3px 6px',
+            borderRadius: '4px',
+            border: '1px solid #28283c',
+            width: '100%',
+          }}
+        >
+          <div>{isAnomaly(tileId) ? 'Anom: Yes' : 'Anom: No'}</div>
+          <div>{getWormholeType(tileId) ? `WH: ${getWormholeType(tileId)}` : 'WH: None'}</div>
+        </div>
+      )}
     </div>
   );
 }

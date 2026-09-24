@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { DEFAULT_BLUE_TILES, getDefaultTiersForExpansions } from './data/blueTiles.js';
 import { validateBlueTiers } from './data/tierValidator.js';
-import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles } from './data/tileData.js';
+import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, ALL_37_HEXES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -177,7 +177,8 @@ app.post('/api/rooms', (req, res) => {
       players: formattedPlayers,
       mapState: {
         placedTiles: {}, // index/coord -> tile
-        speakerSlotId: null
+        speakerSlotId: null,
+        currentTurnIndex: 0
       }
     };
 
@@ -331,6 +332,74 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('room_state', room);
   });
 
+  socket.on('place_tile', ({ roomId, slotId, tileId, hexId }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.status !== 'map_building') {
+      socket.emit('room_error', { message: 'Room not in map building phase' });
+      return;
+    }
+
+    const currentTurnIndex = room.mapState.currentTurnIndex || 0;
+    const currentTurnPlayer = getPlayerForTurn(room.players, currentTurnIndex);
+    if (!currentTurnPlayer || currentTurnPlayer.slotId !== slotId) {
+      socket.emit('room_error', { message: 'It is not your turn!' });
+      return;
+    }
+
+    const player = room.players.find(p => p.slotId === slotId);
+    if (!player || !player.hand) {
+      socket.emit('room_error', { message: 'Player hand not found' });
+      return;
+    }
+
+    const tileNum = Number(tileId);
+    const blueIdx = player.hand.blue.indexOf(tileNum);
+    const redIdx = player.hand.red.indexOf(tileNum);
+
+    if (blueIdx === -1 && redIdx === -1) {
+      socket.emit('room_error', { message: 'Tile not found in your hand' });
+      return;
+    }
+
+    const targetHex = ALL_37_HEXES.find(h => h.id === hexId);
+    if (!targetHex) {
+      socket.emit('room_error', { message: 'Invalid target hex' });
+      return;
+    }
+
+    const activeRing = getCurrentActiveRing(room.mapState.placedTiles, ALL_37_HEXES);
+    const validation = validatePlacement(room.mapState.placedTiles, targetHex, tileNum, activeRing, ALL_37_HEXES);
+
+    if (!validation.allowed) {
+      socket.emit('room_error', { message: validation.reason || 'Invalid placement' });
+      return;
+    }
+
+    // Apply placement
+    if (blueIdx >= 0) {
+      player.hand.blue.splice(blueIdx, 1);
+      player.remainingBlue = player.hand.blue.length;
+    } else {
+      player.hand.red.splice(redIdx, 1);
+      player.remainingRed = player.hand.red.length;
+    }
+
+    room.mapState.placedTiles[hexId] = {
+      tileId: tileNum,
+      slotId,
+      type: blueIdx >= 0 ? 'blue' : 'red'
+    };
+
+    room.mapState.currentTurnIndex = currentTurnIndex + 1;
+
+    const totalTilesToPlace = room.players.length * 5;
+    if (room.mapState.currentTurnIndex >= totalTilesToPlace) {
+      room.status = 'completed';
+    }
+
+    io.to(roomId).emit('room_state', room);
+  });
+
   // DEV TOOLBAR: Reset room back to lobby and clear all claims
   socket.on('dev_reset_room', ({ roomId }) => {
     const room = rooms.get(roomId);
@@ -348,7 +417,8 @@ io.on('connection', (socket) => {
     room.players.sort((a, b) => a.slotId - b.slotId);
     room.mapState = {
       placedTiles: {},
-      speakerSlotId: null
+      speakerSlotId: null,
+      currentTurnIndex: 0
     };
 
     io.to(roomId).emit('room_state', room);
