@@ -220,10 +220,14 @@
    - Alpha wormhole tiles cannot be placed adjacent to Alpha wormholes.
    - Beta wormhole tiles cannot be placed adjacent to Beta wormholes.
 3. **"No Other Choice" Exception ("Forced Placement"):**
-   - If placing a tile on an available hex in the active ring violates an adjacency rule, the placement is permitted if and only if *every* available empty hex in the current active ring would also violate the adjacency rule (i.e. no legal placement exists without violation).
-4. **Placement Workflow:**
+   - Forced placement triggers **if and only if** the player has **no legal placement available** with **any tile** currently in their hand on **any available empty hex** in the current active ring (i.e. every hand tile would cause an adjacency violation on every available empty hex in the active ring).
+   - If the player holds at least one tile in hand that can be legally placed on at least one empty hex in the active ring without violating adjacency rules, forced placement **does not** trigger, and placing any violating tile adjacent to another anomaly / matching wormhole is strictly rejected.
+   - When forced placement is legitimately active (player has zero legal moves available across all hand tiles and empty ring hexes), the placement with violations is permitted (`forced: true`), the Accept button is enabled in amber, and the server validates and accepts the placement without errors or rejections.
+4. **Placement Workflow & Error Handling:**
    - Active player selects a tile from hand (`PlayerHandPanel`). Temporary debug labels beneath hand tiles show Anomaly and Wormhole parameters.
    - Player clicks an eligible empty hex in the active ring (`MapGrid`).
+   - Real-time validation feedback runs via `validatePlacement(placedTiles, targetHex, tileId, activeRing, allHexes, player)`.
    - An **Accept** button appears in the placement action bar alongside real-time validation feedback.
    - Clicking **Accept** confirms the choice (`place_tile` socket event), places the tile on the board, removes it from the player's hand, and advances the turn in snake order.
+   - Any runtime socket error (e.g. `room_error`) is presented as a dismissible notification banner above the map rather than unmounting or crashing the room view.
 

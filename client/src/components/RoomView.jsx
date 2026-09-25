@@ -16,11 +16,20 @@ export default function RoomView() {
   const [room, setRoom] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [actionError, setActionError] = useState(null);
   const [socket, setSocket] = useState(null);
   const [copied, setCopied] = useState(false);
   const [selectedTileId, setSelectedTileId] = useState(null);
   const [pendingHexId, setPendingHexId] = useState(null);
   const [hoveredTileId, setHoveredTileId] = useState(null);
+
+  useEffect(() => {
+    if (!actionError) return;
+    const timer = setTimeout(() => {
+      setActionError(null);
+    }, 6000);
+    return () => clearTimeout(timer);
+  }, [actionError]);
 
   const handleSwitchUser = (newUserId) => {
     setActiveUserOverride(newUserId);
@@ -66,7 +75,14 @@ export default function RoomView() {
     });
 
     newSocket.on('room_error', ({ message }) => {
-      setError(message);
+      setRoom((currentRoom) => {
+        if (!currentRoom) {
+          setError(message);
+        } else {
+          setActionError(message);
+        }
+        return currentRoom;
+      });
     });
 
     setSocket(newSocket);
@@ -149,6 +165,7 @@ export default function RoomView() {
 
   const handleAcceptPlacement = () => {
     if (!socket || !myClaimedSlot || !selectedTileId || !pendingHexId) return;
+    setActionError(null);
     socket.emit('place_tile', {
       roomId,
       slotId: myClaimedSlot.slotId,
@@ -557,6 +574,48 @@ export default function RoomView() {
               alignItems: 'center',
             }}
           >
+            {/* Placement / Runtime Error Notification Banner */}
+            {actionError && (
+              <div
+                id="room-action-error-banner"
+                style={{
+                  marginBottom: '14px',
+                  width: '100%',
+                  maxWidth: '920px',
+                  backgroundColor: '#7f1d1d',
+                  border: '1px solid #ef4444',
+                  borderRadius: '8px',
+                  padding: '10px 16px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  color: '#fee2e2',
+                  fontSize: '13px',
+                  boxShadow: '0 4px 14px rgba(239, 68, 68, 0.35)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '16px' }}>⚠️</span>
+                  <span><strong>Placement Notice:</strong> {actionError}</span>
+                </div>
+                <button
+                  onClick={() => setActionError(null)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#fca5a5',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    padding: '0 4px',
+                  }}
+                  title="Dismiss"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
             {/* The Big 3-Ring Hexagonal Board */}
             <MapGrid
               room={room}
@@ -565,6 +624,7 @@ export default function RoomView() {
               pendingHexId={pendingHexId}
               onSelectHex={(hexId) => {
                 if (isMyTurn && selectedTileId) {
+                  setActionError(null);
                   setPendingHexId(hexId);
                 }
               }}
@@ -602,7 +662,7 @@ export default function RoomView() {
                         <span>
                           Target Hex: <strong style={{ color: '#fbbf24' }}>{pendingHexId}</strong>{' '}
                           {pendingValidation && (
-                            <span style={{ color: pendingValidation.allowed ? '#34d399' : '#ef4444', marginLeft: '8px', fontWeight: '600' }}>
+                            <span style={{ color: pendingValidation.allowed ? (pendingValidation.forced ? '#fbbf24' : '#34d399') : '#ef4444', marginLeft: '8px', fontWeight: '600' }}>
                               ({pendingValidation.reason})
                             </span>
                           )}
@@ -662,6 +722,7 @@ export default function RoomView() {
               activeTileId={selectedTileId}
               onSelectTile={(tileId) => {
                 if (isMyTurn) {
+                  setActionError(null);
                   setSelectedTileId(tileId);
                   setPendingHexId(null);
                 }

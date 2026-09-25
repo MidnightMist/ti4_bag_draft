@@ -230,6 +230,10 @@ export function checkTileViolations(placedTiles = {}, hex, tileId, allHexes = AL
 }
 
 export function validatePlacement(placedTiles = {}, targetHex, tileId, activeRing, allHexes = ALL_37_HEXES, player = null) {
+  if (!targetHex) {
+    return { allowed: false, reason: 'Invalid target hex' };
+  }
+
   if (placedTiles[targetHex.id]) {
     return { allowed: false, reason: 'Hex is already occupied' };
   }
@@ -238,30 +242,52 @@ export function validatePlacement(placedTiles = {}, targetHex, tileId, activeRin
     return { allowed: false, reason: `Must place in Ring ${activeRing} first` };
   }
 
-  const violations = checkTileViolations(placedTiles, targetHex, tileId, allHexes);
+  const tileNum = Number(tileId);
+  const violations = checkTileViolations(placedTiles, targetHex, tileNum, allHexes);
 
   if (!violations.hasViolation) {
     return { allowed: true, forced: false, reason: 'Valid placement' };
   }
 
-  // Forced placement rule (TI4 Bag Draft):
-  // Forced placement is allowed ONLY IF there are NO OTHER empty hexes
-  // in the active ring where this tile can be placed without violation.
+  // Determine available empty hexes in the current active ring
   const emptyHexesInRing = allHexes.filter(h => {
     if (h.ring !== activeRing) return false;
     if (activeRing === 3 && h.type !== 'ring3') return false;
     return !placedTiles[h.id];
   });
 
-  let anyLegalHexExists = false;
-  for (const emptyHex of emptyHexesInRing) {
-    const v = checkTileViolations(placedTiles, emptyHex, tileId, allHexes);
-    if (!v.hasViolation) {
-      anyLegalHexExists = true;
-      break;
-    }
+  // Forced placement rule (TI4 Bag Draft):
+  // A placement that violates adjacency rules (anomaly next to anomaly, or matching wormholes)
+  // is ONLY allowed if the player has NO legal placement available at all (i.e. every tile remaining
+  // in the player's hand violates rules on every available empty hex in the current active ring).
+  let handTiles = [];
+  if (player && player.hand) {
+    handTiles = [...(player.hand.blue || []), ...(player.hand.red || [])];
   }
-  const canForce = !anyLegalHexExists;
+
+  let canForce = false;
+
+  if (handTiles.length > 0) {
+    // Check if there is ANY legal placement for ANY tile in the player's hand on ANY empty hex in the ring
+    const hasAnyLegalMove = handTiles.some(t => {
+      const tNum = Number(t);
+      return emptyHexesInRing.some(emptyHex => {
+        const v = checkTileViolations(placedTiles, emptyHex, tNum, allHexes);
+        return !v.hasViolation;
+      });
+    });
+
+    // Forced placement triggers IF AND ONLY IF no legal move exists anywhere for this player
+    canForce = !hasAnyLegalMove;
+  } else {
+    // Fallback if player or player hand is not provided:
+    // Check if this specific tile can be legally placed on ANY empty hex in the ring
+    const anyLegalHexExists = emptyHexesInRing.some(emptyHex => {
+      const v = checkTileViolations(placedTiles, emptyHex, tileNum, allHexes);
+      return !v.hasViolation;
+    });
+    canForce = !anyLegalHexExists;
+  }
 
   if (!canForce) {
     let reason = 'Cannot place ';
@@ -270,7 +296,7 @@ export function validatePlacement(placedTiles = {}, targetHex, tileId, activeRin
     else if (violations.betaViolation) reason += 'Beta wormhole adjacent to Beta wormhole';
     return { allowed: false, reason };
   } else {
-    return { allowed: true, forced: true, reason: 'Forced placement (no legal tiles in hand for this hex)' };
+    return { allowed: true, forced: true, reason: 'Forced placement (no legal placement available)' };
   }
 }
 
