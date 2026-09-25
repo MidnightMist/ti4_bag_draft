@@ -372,9 +372,9 @@ export default function MapGrid({
   if (perspectiveSeatIndex !== null && perspectiveSeatIndex !== undefined) {
     activeViewerSeat = Number(perspectiveSeatIndex);
   } else if (mySlot) {
-    if (playerCount === 5) {
+    if (playerCount === 5 || playerCount === 4) {
       const myPlayerIdx = players.findIndex(p => p.slotId === mySlot.slotId);
-      activeViewerSeat = myPlayerIdx >= 0 ? getSeatIndexForPlayer(myPlayerIdx, 5) : 0;
+      activeViewerSeat = myPlayerIdx >= 0 ? getSeatIndexForPlayer(myPlayerIdx, playerCount) : 0;
     } else {
       const viewerSeatIndex = players.findIndex(p => p.slotId === mySlot.slotId);
       activeViewerSeat = viewerSeatIndex >= 0 ? viewerSeatIndex : 0;
@@ -386,11 +386,11 @@ export default function MapGrid({
 
   // Oriented label
   let orientedLabel = 'Player 1';
-  if (playerCount === 5) {
+  if (playerCount === 5 || playerCount === 4) {
     if (activeViewerSeat === 0) {
       orientedLabel = 'Overview (Hyperlanes South)';
     } else {
-      const p = getPlayerForSeatIndex(players, activeViewerSeat, 5);
+      const p = getPlayerForSeatIndex(players, activeViewerSeat, playerCount);
       orientedLabel = p ? p.name : `Seat #${activeViewerSeat}`;
     }
   } else {
@@ -657,9 +657,9 @@ export default function MapGrid({
             if (placed) {
               const isPending = pendingHexId === hex.id;
               const isHyperlane = placed.isHyperlane;
-              // Hyperlane tiles need to counter-rotate by -activeViewerSeat * 60 degrees (or equivalently inverse of the board rotation angle)
-              // so that their drawn line paths stay connected correctly in screen view across all player perspectives.
-              const hyperlaneRotation = isHyperlane ? (-activeViewerSeat * 60) : 0;
+              // Hyperlane tiles keep base rotation defined in tile data plus counter-rotation by -activeViewerSeat * 60 degrees
+              const baseHyperlaneRotation = placed.rotation || 0;
+              const hyperlaneRotation = isHyperlane ? (baseHyperlaneRotation - activeViewerSeat * 60) : 0;
 
               return (
                 <HexTile

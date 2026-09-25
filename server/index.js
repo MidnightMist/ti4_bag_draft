@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { DEFAULT_BLUE_TILES, getDefaultTiersForExpansions } from './data/blueTiles.js';
 import { validateBlueTiers } from './data/tierValidator.js';
-import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, ALL_37_HEXES, FIVE_PLAYER_HYPERLANES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
+import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, ALL_37_HEXES, FIVE_PLAYER_HYPERLANES, FOUR_PLAYER_HYPERLANES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -164,7 +164,7 @@ app.post('/api/rooms', (req, res) => {
     }
 
     const roomId = generateRoomId();
-    const initialPlacedTiles = count === 5 ? { ...FIVE_PLAYER_HYPERLANES } : {};
+    const initialPlacedTiles = count === 5 ? { ...FIVE_PLAYER_HYPERLANES } : count === 4 ? { ...FOUR_PLAYER_HYPERLANES } : {};
 
     const roomData = {
       id: roomId,
@@ -459,7 +459,7 @@ io.on('connection', (socket) => {
       p.remainingRed = 2;
     });
     room.players.sort((a, b) => a.slotId - b.slotId);
-    const resetPlacedTiles = room.settings?.playerCount === 5 ? { ...FIVE_PLAYER_HYPERLANES } : {};
+    const resetPlacedTiles = room.settings?.playerCount === 5 ? { ...FIVE_PLAYER_HYPERLANES } : room.settings?.playerCount === 4 ? { ...FOUR_PLAYER_HYPERLANES } : {};
     room.mapState = {
       placedTiles: resetPlacedTiles,
       speakerSlotId: null,

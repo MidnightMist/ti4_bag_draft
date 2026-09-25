@@ -152,10 +152,10 @@ export default function RoomView() {
   const isCompleted = room.status === 'completed';
   const speaker = room.players.find((p) => p.isSpeaker);
 
-  // Perspective calculation: default to viewer's claimed seat, or seat 0 (Player 1 in 6p, Overview in 5p)
+  // Perspective calculation: default to viewer's claimed seat, or seat 0 (Player 1 in 6p, Overview in 5p/4p)
   const defaultPerspectiveSeat = myClaimedSlot
-    ? (totalSlots === 5
-        ? getSeatIndexForPlayer(room.players.findIndex(p => p.slotId === myClaimedSlot.slotId), 5)
+    ? ((totalSlots === 5 || totalSlots === 4)
+        ? getSeatIndexForPlayer(room.players.findIndex(p => p.slotId === myClaimedSlot.slotId), totalSlots)
         : room.players.findIndex(p => p.slotId === myClaimedSlot.slotId))
     : 0;
   const activePerspectiveSeat = selectedPerspectiveSeat !== null ? selectedPerspectiveSeat : (defaultPerspectiveSeat >= 0 ? defaultPerspectiveSeat : 0);
@@ -509,7 +509,7 @@ export default function RoomView() {
 
               {/* Player Perspective Buttons */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {totalSlots === 5 && (
+                {(totalSlots === 5 || totalSlots === 4) && (
                   <button
                     id="perspective-btn-overview"
                     onClick={() => setSelectedPerspectiveSeat(0)}
@@ -542,7 +542,7 @@ export default function RoomView() {
                 )}
 
                 {room.players.map((player, playerIdx) => {
-                  const targetSeat = totalSlots === 5 ? getSeatIndexForPlayer(playerIdx, 5) : playerIdx;
+                  const targetSeat = (totalSlots === 5 || totalSlots === 4) ? getSeatIndexForPlayer(playerIdx, totalSlots) : playerIdx;
                   const isOriented = activePerspectiveSeat === targetSeat;
                   const isViewer = myClaimedSlot && myClaimedSlot.slotId === player.slotId;
 
@@ -646,7 +646,7 @@ export default function RoomView() {
                     onClick={() => {
                       const myIdx = room.players.findIndex(p => p.slotId === myClaimedSlot.slotId);
                       if (myIdx >= 0) {
-                        const targetSeat = totalSlots === 5 ? getSeatIndexForPlayer(myIdx, 5) : myIdx;
+                        const targetSeat = (totalSlots === 5 || totalSlots === 4) ? getSeatIndexForPlayer(myIdx, totalSlots) : myIdx;
                         setSelectedPerspectiveSeat(targetSeat);
                       }
                     }}

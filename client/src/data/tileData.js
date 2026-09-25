@@ -165,14 +165,38 @@ export function generate37Hexes() {
 
 export const ALL_37_HEXES = generate37Hexes();
 
-// Pre-placed fixed hyperlane tiles for 5-player galaxy map
-export const FIVE_PLAYER_HYPERLANES = {
-  'ring1-0': { tileId: '85A', type: 'hyperlane', isHyperlane: true, fixed: true },
-  'ring2-edge-0': { tileId: '87A', type: 'hyperlane', isHyperlane: true, fixed: true },
-  'ring2-edge-5': { tileId: '88A', type: 'hyperlane', isHyperlane: true, fixed: true },
-  'ring3-edge-0-1': { tileId: '84A', type: 'hyperlane', isHyperlane: true, fixed: true },
-  'ring3-edge-5-2': { tileId: '83A', type: 'hyperlane', isHyperlane: true, fixed: true },
-  'home-system-0': { tileId: '86A', type: 'hyperlane', isHyperlane: true, fixed: true },
+// Pre-placed fixed hyperlane tiles for 4-player galaxy map (with hyperlanes on both South and North corridors)
+export const FOUR_PLAYER_HYPERLANES = {
+  // South corridor (d = 0) - original orientation
+  'ring1-0': { tileId: '85A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 0 },
+  'ring2-edge-0': { tileId: '87A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 0 },
+  'ring2-edge-5': { tileId: '88A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 0 },
+  'ring3-edge-0-1': { tileId: '84A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 0 },
+  'ring3-edge-5-2': { tileId: '83A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 0 },
+  'home-system-0': { tileId: '86A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 0 },
+
+  // North corridor (d = 3) - 85, 83, 84, 86 inverted (180 deg), 88 and 87 rotated 180 deg
+  'ring1-3': { tileId: '85A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 180 },
+  'ring2-edge-3': { tileId: '87A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 180 },
+  'ring2-edge-2': { tileId: '88A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 180 },
+  'ring3-edge-3-1': { tileId: '84A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 180 },
+  'ring3-edge-2-2': { tileId: '83A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 180 },
+  'home-system-3': { tileId: '86A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 180 },
+};
+
+// 4-player seat mapping: P1 (North-East = seat 4), P2 (South-East = seat 5), P3 (South-West = seat 1), P4 (North-West = seat 2)
+export const FOUR_PLAYER_SEAT_TO_PLAYER_INDEX = {
+  4: 0,
+  5: 1,
+  1: 2,
+  2: 3,
+};
+
+export const FOUR_PLAYER_PLAYER_TO_SEAT_INDEX = {
+  0: 4,
+  1: 5,
+  2: 1,
+  3: 2,
 };
 
 // 5-player seat mapping:
@@ -204,12 +228,19 @@ export function getPlayerForSeatIndex(players, seatIndex, playerCount = 6) {
     const pIdx = FIVE_PLAYER_SEAT_TO_PLAYER_INDEX[seatIndex];
     return pIdx !== undefined ? players[pIdx] : null;
   }
+  if (playerCount === 4) {
+    const pIdx = FOUR_PLAYER_SEAT_TO_PLAYER_INDEX[seatIndex];
+    return pIdx !== undefined ? players[pIdx] : null;
+  }
   return players[seatIndex] || null;
 }
 
 export function getSeatIndexForPlayer(playerIndex, playerCount = 6) {
   if (playerCount === 5) {
     return FIVE_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
+  }
+  if (playerCount === 4) {
+    return FOUR_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
   }
   return playerIndex;
 }
@@ -261,6 +292,59 @@ export function getHexNeighbors(hex, allHexes = ALL_37_HEXES, playerCount = 6) {
     };
 
     const extras = extraAdjacencyMap[hex.id];
+    if (extras) {
+      extras.forEach(extraId => {
+        if (!neighbors.some(n => n.id === extraId)) {
+          const target = allHexes.find(h => h.id === extraId);
+          if (target) neighbors.push(target);
+        }
+      });
+    }
+  }
+
+  if (playerCount === 4) {
+    // 4-player hyperlane adjacency map (supports both South and North hyperlane corridors)
+    const extraAdjacencyMap4 = {
+      // South corridor (d = 0)
+      'ring1-0': ['ring1-1', 'ring1-5', 'ring2-corner-0'],
+      'ring1-1': ['ring1-0', 'ring1-5', 'ring2-corner-0'],
+      'ring1-5': ['ring1-0', 'ring1-1', 'ring2-corner-0'],
+      'ring2-corner-0': [
+        'ring1-0',
+        'ring1-1',
+        'ring1-5',
+        'ring2-corner-5',
+        'ring3-edge-5-1',
+        'ring3-edge-0-2',
+        'ring2-corner-1'
+      ],
+      'ring2-corner-5': ['ring2-corner-0'],
+      'ring3-edge-5-1': ['ring2-corner-0', 'ring3-edge-0-2'],
+      'ring3-edge-0-2': ['ring2-corner-0', 'ring3-edge-5-1'],
+      'ring2-corner-1': ['ring2-corner-0'],
+
+      // North corridor (d = 3) - ring1-3, ring1-2, ring1-4 connected through hyperlane/corner-3
+      'ring1-3': ['ring1-2', 'ring1-4', 'ring2-corner-3'],
+      'ring1-2': ['ring1-3', 'ring1-4', 'ring2-corner-3'],
+      'ring1-4': ['ring1-3', 'ring1-2', 'ring2-corner-3'],
+      'ring2-corner-3': [
+        'ring1-3',
+        'ring1-2',
+        'ring1-4',
+        'ring2-corner-2',
+        'ring3-edge-2-2',
+        'ring3-edge-3-1',
+        'ring3-edge-3-2',
+        'ring2-corner-4'
+      ],
+      'ring2-corner-2': ['ring2-corner-3'],
+      'ring3-edge-2-2': ['ring2-corner-3', 'ring3-edge-3-1', 'ring3-edge-3-2'],
+      'ring3-edge-3-1': ['ring2-corner-3', 'ring3-edge-2-2', 'ring3-edge-3-2'],
+      'ring3-edge-3-2': ['ring2-corner-3', 'ring3-edge-2-2', 'ring3-edge-3-1'],
+      'ring2-corner-4': ['ring2-corner-3']
+    };
+
+    const extras = extraAdjacencyMap4[hex.id];
     if (extras) {
       extras.forEach(extraId => {
         if (!neighbors.some(n => n.id === extraId)) {
