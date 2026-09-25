@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getMecatolTileId, getCurrentActiveRing, ALL_37_HEXES } from '../data/tileData.js';
+import { getMecatolTileId, getCurrentActiveRing, ALL_37_HEXES, getPlayerForSeatIndex, getSeatIndexForPlayer } from '../data/tileData.js';
 
 // Geometry constants for flat-topped hexagonal grid
 // Radius enlarged from 54 to 62 for maximum board presence
@@ -60,6 +60,7 @@ function HexTile({
   onMouseLeave,
   cursor = 'default',
   showTileNumber = false,
+  rotation = 0,
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = tileId && !imgFailed;
@@ -68,7 +69,7 @@ function HexTile({
 
   return (
     <g
-      transform={`translate(${cx}, ${cy})`}
+      transform={`translate(${cx}, ${cy})${rotation ? ` rotate(${rotation})` : ''}`}
       className="map-hex-tile"
       onClick={onClick}
       onMouseEnter={onMouseEnter}
@@ -363,19 +364,39 @@ export default function MapGrid({
   const placedTiles = room?.mapState?.placedTiles || {};
   const activeRing = getCurrentActiveRing(placedTiles, ALL_37_HEXES);
 
+  const playerCount = room?.settings?.playerCount || players.length;
+
   // Rotation logic: if perspectiveSeatIndex is explicitly passed, use it;
   // otherwise default to viewer home system at bottom (South, d=0)
   let activeViewerSeat = 0;
   if (perspectiveSeatIndex !== null && perspectiveSeatIndex !== undefined) {
     activeViewerSeat = Number(perspectiveSeatIndex);
   } else if (mySlot) {
-    const viewerSeatIndex = players.findIndex(p => p.slotId === mySlot.slotId);
-    activeViewerSeat = viewerSeatIndex >= 0 ? viewerSeatIndex : 0;
+    if (playerCount === 5) {
+      const myPlayerIdx = players.findIndex(p => p.slotId === mySlot.slotId);
+      activeViewerSeat = myPlayerIdx >= 0 ? getSeatIndexForPlayer(myPlayerIdx, 5) : 0;
+    } else {
+      const viewerSeatIndex = players.findIndex(p => p.slotId === mySlot.slotId);
+      activeViewerSeat = viewerSeatIndex >= 0 ? viewerSeatIndex : 0;
+    }
   }
   const theta = -activeViewerSeat * (Math.PI / 3);
   const cosT = Math.cos(theta);
   const sinT = Math.sin(theta);
-  const orientedPlayer = players[activeViewerSeat] || { name: `Player ${activeViewerSeat + 1}` };
+
+  // Oriented label
+  let orientedLabel = 'Player 1';
+  if (playerCount === 5) {
+    if (activeViewerSeat === 0) {
+      orientedLabel = 'Overview (Hyperlanes South)';
+    } else {
+      const p = getPlayerForSeatIndex(players, activeViewerSeat, 5);
+      orientedLabel = p ? p.name : `Seat #${activeViewerSeat}`;
+    }
+  } else {
+    const orientedPlayer = players[activeViewerSeat] || { name: `Player ${activeViewerSeat + 1}` };
+    orientedLabel = orientedPlayer.name;
+  }
 
   return (
     <div
@@ -437,8 +458,10 @@ export default function MapGrid({
             }}
           >
             <span>🧭 Oriented to:</span>
-            <strong style={{ color: '#fff' }}>{orientedPlayer.name}</strong>
-            <span style={{ fontSize: '10px', color: '#a7f3d0' }}>(South)</span>
+            <strong style={{ color: '#fff' }}>{orientedLabel}</strong>
+            {(activeViewerSeat !== 0 || playerCount !== 5) && (
+              <span style={{ fontSize: '10px', color: '#a7f3d0' }}>(South)</span>
+            )}
           </span>
 
           {/* Zoom & Fullscreen Controls */}
@@ -596,8 +619,11 @@ export default function MapGrid({
               );
             }
 
-            if (hex.type === 'home_system') {
-              const player = players[hex.seatIndex] || {
+            // Check if this hex has a placed tile (including hyperlanes)
+            const placed = placedTiles[hex.id];
+
+            if (hex.type === 'home_system' && !placed) {
+              const player = getPlayerForSeatIndex(players, hex.seatIndex, playerCount) || {
                 name: `Player ${hex.seatIndex + 1}`,
                 slotId: hex.seatIndex,
               };
@@ -628,22 +654,29 @@ export default function MapGrid({
               );
             }
 
-            // Check if placed tile exists
-            const placed = placedTiles[hex.id];
             if (placed) {
+              const isPending = pendingHexId === hex.id;
+              const isHyperlane = placed.isHyperlane;
+              // Hyperlane tiles need to counter-rotate by -activeViewerSeat * 60 degrees (or equivalently inverse of the board rotation angle)
+              // so that their drawn line paths stay connected correctly in screen view across all player perspectives.
+              const hyperlaneRotation = isHyperlane ? (-activeViewerSeat * 60) : 0;
+
               return (
                 <HexTile
                   key={hex.id}
                   cx={rx}
                   cy={ry}
                   tileId={placed.tileId}
-                  subLabel={`Tile ${placed.tileId}`}
+                  label={isHyperlane ? `Hyperlane ${placed.tileId}` : `Tile ${placed.tileId}`}
+                  isPlaceholder={false}
+                  isPending={isPending}
                   fill="#181824"
-                  stroke="#4f46e5"
-                  strokeWidth={1}
-                  onMouseEnter={() => onHoverTile && onHoverTile(placed.tileId)}
-                  onMouseLeave={() => onHoverTile && onHoverTile(null)}
-                  showTileNumber={isCompleted && showTileNumbers}
+                  stroke={isHyperlane ? '#4338ca' : placed.type === 'blue' ? '#3b82f6' : placed.type === 'red' ? '#ef4444' : '#4f46e5'}
+                  strokeWidth={isHyperlane ? 1.5 : 1}
+                  onMouseEnter={() => !isHyperlane && onHoverTile && onHoverTile(placed.tileId)}
+                  onMouseLeave={() => !isHyperlane && onHoverTile && onHoverTile(null)}
+                  showTileNumber={isCompleted && showTileNumbers && !isHyperlane}
+                  rotation={hyperlaneRotation}
                 />
               );
             }

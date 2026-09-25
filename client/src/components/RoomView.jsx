@@ -6,7 +6,7 @@ import MapGrid from './MapGrid.jsx';
 import DevToolbar from './DevToolbar.jsx';
 import PlayerHandPanel from './PlayerHandPanel.jsx';
 import TileZoomPreview from './TileZoomPreview.jsx';
-import { getPlayerForTurn, validatePlacement, getCurrentActiveRing, ALL_37_HEXES } from '../data/tileData.js';
+import { getPlayerForTurn, validatePlacement, getCurrentActiveRing, ALL_37_HEXES, getSeatIndexForPlayer } from '../data/tileData.js';
 
 export default function RoomView() {
   const { roomId } = useParams();
@@ -152,8 +152,12 @@ export default function RoomView() {
   const isCompleted = room.status === 'completed';
   const speaker = room.players.find((p) => p.isSpeaker);
 
-  // Perspective calculation: default to viewer's claimed seat, or seat 0 (Player 1)
-  const defaultPerspectiveSeat = myClaimedSlot ? room.players.findIndex(p => p.slotId === myClaimedSlot.slotId) : 0;
+  // Perspective calculation: default to viewer's claimed seat, or seat 0 (Player 1 in 6p, Overview in 5p)
+  const defaultPerspectiveSeat = myClaimedSlot
+    ? (totalSlots === 5
+        ? getSeatIndexForPlayer(room.players.findIndex(p => p.slotId === myClaimedSlot.slotId), 5)
+        : room.players.findIndex(p => p.slotId === myClaimedSlot.slotId))
+    : 0;
   const activePerspectiveSeat = selectedPerspectiveSeat !== null ? selectedPerspectiveSeat : (defaultPerspectiveSeat >= 0 ? defaultPerspectiveSeat : 0);
 
   // Turn calculation
@@ -167,7 +171,7 @@ export default function RoomView() {
   if (selectedTileId && pendingHexId) {
     const targetHex = ALL_37_HEXES.find(h => h.id === pendingHexId);
     if (targetHex) {
-      pendingValidation = validatePlacement(room.mapState?.placedTiles || {}, targetHex, selectedTileId, activeRing, ALL_37_HEXES, currentTurnPlayer);
+      pendingValidation = validatePlacement(room.mapState?.placedTiles || {}, targetHex, selectedTileId, activeRing, ALL_37_HEXES, currentTurnPlayer, totalSlots);
     }
   }
 
@@ -505,15 +509,48 @@ export default function RoomView() {
 
               {/* Player Perspective Buttons */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {room.players.map((player, seatIdx) => {
-                  const isOriented = activePerspectiveSeat === seatIdx;
+                {totalSlots === 5 && (
+                  <button
+                    id="perspective-btn-overview"
+                    onClick={() => setSelectedPerspectiveSeat(0)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '10px 12px',
+                      backgroundColor: activePerspectiveSeat === 0 ? '#064e3b' : '#1f1f2e',
+                      border: activePerspectiveSeat === 0 ? '1.5px solid #10b981' : '1px solid #2f2f45',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      color: activePerspectiveSeat === 0 ? '#ecfdf5' : '#d1d5db',
+                      fontWeight: activePerspectiveSeat === 0 ? '700' : '500',
+                      fontSize: '13px',
+                      transition: 'all 0.15s ease',
+                      boxShadow: activePerspectiveSeat === 0 ? '0 0 12px rgba(16, 185, 129, 0.35)' : 'none',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span>🌌</span>
+                      <span>Overview (Hyperlanes South)</span>
+                    </div>
+                    {activePerspectiveSeat === 0 ? (
+                      <span style={{ fontSize: '11px', color: '#6ee7b7', fontWeight: 'bold' }}>✓ Active</span>
+                    ) : (
+                      <span style={{ fontSize: '11px', color: '#6b7280' }}>View ↷</span>
+                    )}
+                  </button>
+                )}
+
+                {room.players.map((player, playerIdx) => {
+                  const targetSeat = totalSlots === 5 ? getSeatIndexForPlayer(playerIdx, 5) : playerIdx;
+                  const isOriented = activePerspectiveSeat === targetSeat;
                   const isViewer = myClaimedSlot && myClaimedSlot.slotId === player.slotId;
 
                   return (
                     <button
-                      key={player.slotId ?? seatIdx}
-                      id={`perspective-btn-${seatIdx}`}
-                      onClick={() => setSelectedPerspectiveSeat(seatIdx)}
+                      key={player.slotId ?? playerIdx}
+                      id={`perspective-btn-${playerIdx}`}
+                      onClick={() => setSelectedPerspectiveSeat(targetSeat)}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
@@ -532,7 +569,7 @@ export default function RoomView() {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span style={{ color: isOriented ? '#34d399' : '#6b7280', fontSize: '12px', fontFamily: 'monospace' }}>
-                          #{seatIdx + 1}
+                          #{playerIdx + 1}
                         </span>
                         <span>{player.name}</span>
                         {player.isSpeaker && <span title="Speaker">👑</span>}
@@ -608,7 +645,10 @@ export default function RoomView() {
                     id="rotate-reset-btn"
                     onClick={() => {
                       const myIdx = room.players.findIndex(p => p.slotId === myClaimedSlot.slotId);
-                      if (myIdx >= 0) setSelectedPerspectiveSeat(myIdx);
+                      if (myIdx >= 0) {
+                        const targetSeat = totalSlots === 5 ? getSeatIndexForPlayer(myIdx, 5) : myIdx;
+                        setSelectedPerspectiveSeat(targetSeat);
+                      }
                     }}
                     style={{
                       padding: '8px 10px',

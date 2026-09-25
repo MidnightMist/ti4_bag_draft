@@ -165,7 +165,56 @@ export function generate37Hexes() {
 
 export const ALL_37_HEXES = generate37Hexes();
 
-export function getHexNeighbors(hex, allHexes = ALL_37_HEXES) {
+// Pre-placed fixed hyperlane tiles for 5-player galaxy map
+export const FIVE_PLAYER_HYPERLANES = {
+  'ring1-0': { tileId: '85A', type: 'hyperlane', isHyperlane: true, fixed: true },
+  'ring2-edge-0': { tileId: '87A', type: 'hyperlane', isHyperlane: true, fixed: true },
+  'ring2-edge-5': { tileId: '88A', type: 'hyperlane', isHyperlane: true, fixed: true },
+  'ring3-edge-0-1': { tileId: '84A', type: 'hyperlane', isHyperlane: true, fixed: true },
+  'ring3-edge-5-2': { tileId: '83A', type: 'hyperlane', isHyperlane: true, fixed: true },
+  'home-system-0': { tileId: '86A', type: 'hyperlane', isHyperlane: true, fixed: true },
+};
+
+// 5-player seat mapping:
+// Seat 3: North -> Player 1 (Index 0, Speaker)
+// Seat 4: North-East -> Player 2 (Index 1)
+// Seat 5: South-East -> Player 3 (Index 2)
+// Seat 1: South-West -> Player 4 (Index 3)
+// Seat 2: North-West -> Player 5 (Index 4)
+// Seat 0: South -> Hyperlane tile 86A
+export const FIVE_PLAYER_SEAT_TO_PLAYER_INDEX = {
+  3: 0,
+  4: 1,
+  5: 2,
+  1: 3,
+  2: 4,
+};
+
+export const FIVE_PLAYER_PLAYER_TO_SEAT_INDEX = {
+  0: 3,
+  1: 4,
+  2: 5,
+  3: 1,
+  4: 2,
+};
+
+export function getPlayerForSeatIndex(players, seatIndex, playerCount = 6) {
+  if (!players || players.length === 0) return null;
+  if (playerCount === 5) {
+    const pIdx = FIVE_PLAYER_SEAT_TO_PLAYER_INDEX[seatIndex];
+    return pIdx !== undefined ? players[pIdx] : null;
+  }
+  return players[seatIndex] || null;
+}
+
+export function getSeatIndexForPlayer(playerIndex, playerCount = 6) {
+  if (playerCount === 5) {
+    return FIVE_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
+  }
+  return playerIndex;
+}
+
+export function getHexNeighbors(hex, allHexes = ALL_37_HEXES, playerCount = 6) {
   const neighbors = [];
   const H_dist = 107.39; // sqrt(3) * 62
   for (const other of allHexes) {
@@ -177,6 +226,51 @@ export function getHexNeighbors(hex, allHexes = ALL_37_HEXES) {
       neighbors.push(other);
     }
   }
+
+  // 5-player hyperlane connections:
+  // 1: ring1-1 (South-West ring 1)
+  // 2: ring1-5 (South-East ring 1)
+  // 3: ring2-corner-5 (South-East ring 2)
+  // 4: ring3-edge-5-1 (South-East ring 3 edge)
+  // 5: ring3-edge-0-2 (South-West ring 3 edge)
+  // 6: ring2-corner-1 (South-West ring 2)
+  // 7: ring2-corner-0 (South ring 2 corner)
+  if (playerCount === 5) {
+    const extraAdjacencyMap = {
+      // 1 is adjacent to 2 and 7
+      'ring1-1': ['ring1-5', 'ring2-corner-0'],
+      // 2 is adjacent to 1 and 7
+      'ring1-5': ['ring1-1', 'ring2-corner-0'],
+      // 7 is adjacent to 1, 2, 3, 4, 5, 6
+      'ring2-corner-0': [
+        'ring1-1',
+        'ring1-5',
+        'ring2-corner-5',
+        'ring3-edge-5-1',
+        'ring3-edge-0-2',
+        'ring2-corner-1'
+      ],
+      // 3 is adjacent to 7
+      'ring2-corner-5': ['ring2-corner-0'],
+      // 4 is adjacent to 7 and 5
+      'ring3-edge-5-1': ['ring2-corner-0', 'ring3-edge-0-2'],
+      // 5 is adjacent to 7 and 4
+      'ring3-edge-0-2': ['ring2-corner-0', 'ring3-edge-5-1'],
+      // 6 is adjacent to 7
+      'ring2-corner-1': ['ring2-corner-0']
+    };
+
+    const extras = extraAdjacencyMap[hex.id];
+    if (extras) {
+      extras.forEach(extraId => {
+        if (!neighbors.some(n => n.id === extraId)) {
+          const target = allHexes.find(h => h.id === extraId);
+          if (target) neighbors.push(target);
+        }
+      });
+    }
+  }
+
   return neighbors;
 }
 
@@ -196,8 +290,8 @@ export function getCurrentActiveRing(placedTiles = {}, allHexes = ALL_37_HEXES) 
   return 3;
 }
 
-export function checkTileViolations(placedTiles = {}, hex, tileId, allHexes = ALL_37_HEXES) {
-  const neighbors = getHexNeighbors(hex, allHexes);
+export function checkTileViolations(placedTiles = {}, hex, tileId, allHexes = ALL_37_HEXES, playerCount = 6) {
+  const neighbors = getHexNeighbors(hex, allHexes, playerCount);
   const tileAnomaly = isAnomaly(tileId);
   const tileWh = getWormholeType(tileId);
 
@@ -207,7 +301,7 @@ export function checkTileViolations(placedTiles = {}, hex, tileId, allHexes = AL
 
   for (const n of neighbors) {
     const placed = placedTiles[n.id];
-    if (placed) {
+    if (placed && !placed.isHyperlane) {
       const neighborTileId = placed.tileId;
       if (tileAnomaly && isAnomaly(neighborTileId)) {
         anomalyViolation = true;
@@ -229,7 +323,7 @@ export function checkTileViolations(placedTiles = {}, hex, tileId, allHexes = AL
   };
 }
 
-export function validatePlacement(placedTiles = {}, targetHex, tileId, activeRing, allHexes = ALL_37_HEXES, player = null) {
+export function validatePlacement(placedTiles = {}, targetHex, tileId, activeRing, allHexes = ALL_37_HEXES, player = null, playerCount = 6) {
   if (!targetHex) {
     return { allowed: false, reason: 'Invalid target hex' };
   }
@@ -243,7 +337,7 @@ export function validatePlacement(placedTiles = {}, targetHex, tileId, activeRin
   }
 
   const tileNum = Number(tileId);
-  const violations = checkTileViolations(placedTiles, targetHex, tileNum, allHexes);
+  const violations = checkTileViolations(placedTiles, targetHex, tileNum, allHexes, playerCount);
 
   if (!violations.hasViolation) {
     return { allowed: true, forced: false, reason: 'Valid placement' };
@@ -272,7 +366,7 @@ export function validatePlacement(placedTiles = {}, targetHex, tileId, activeRin
     const hasAnyLegalMove = handTiles.some(t => {
       const tNum = Number(t);
       return emptyHexesInRing.some(emptyHex => {
-        const v = checkTileViolations(placedTiles, emptyHex, tNum, allHexes);
+        const v = checkTileViolations(placedTiles, emptyHex, tNum, allHexes, playerCount);
         return !v.hasViolation;
       });
     });
@@ -283,7 +377,7 @@ export function validatePlacement(placedTiles = {}, targetHex, tileId, activeRin
     // Fallback if player or player hand is not provided:
     // Check if this specific tile can be legally placed on ANY empty hex in the ring
     const anyLegalHexExists = emptyHexesInRing.some(emptyHex => {
-      const v = checkTileViolations(placedTiles, emptyHex, tileNum, allHexes);
+      const v = checkTileViolations(placedTiles, emptyHex, tileNum, allHexes, playerCount);
       return !v.hasViolation;
     });
     canForce = !anyLegalHexExists;

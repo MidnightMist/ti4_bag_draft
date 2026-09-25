@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { DEFAULT_BLUE_TILES, getDefaultTiersForExpansions } from './data/blueTiles.js';
 import { validateBlueTiers } from './data/tierValidator.js';
-import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, ALL_37_HEXES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
+import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, ALL_37_HEXES, FIVE_PLAYER_HYPERLANES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -164,6 +164,8 @@ app.post('/api/rooms', (req, res) => {
     }
 
     const roomId = generateRoomId();
+    const initialPlacedTiles = count === 5 ? { ...FIVE_PLAYER_HYPERLANES } : {};
+
     const roomData = {
       id: roomId,
       createdAt: Date.now(),
@@ -176,7 +178,7 @@ app.post('/api/rooms', (req, res) => {
       },
       players: formattedPlayers,
       mapState: {
-        placedTiles: {}, // index/coord -> tile
+        placedTiles: initialPlacedTiles, // index/coord -> tile
         speakerSlotId: null,
         currentTurnIndex: 0
       }
@@ -367,8 +369,9 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const playerCount = room.settings?.playerCount || room.players.length;
     const activeRing = getCurrentActiveRing(room.mapState.placedTiles, ALL_37_HEXES);
-    const validation = validatePlacement(room.mapState.placedTiles, targetHex, tileNum, activeRing, ALL_37_HEXES, player);
+    const validation = validatePlacement(room.mapState.placedTiles, targetHex, tileNum, activeRing, ALL_37_HEXES, player, playerCount);
 
     if (!validation.allowed) {
       socket.emit('room_error', { message: validation.reason || 'Invalid placement' });
@@ -456,8 +459,9 @@ io.on('connection', (socket) => {
       p.remainingRed = 2;
     });
     room.players.sort((a, b) => a.slotId - b.slotId);
+    const resetPlacedTiles = room.settings?.playerCount === 5 ? { ...FIVE_PLAYER_HYPERLANES } : {};
     room.mapState = {
-      placedTiles: {},
+      placedTiles: resetPlacedTiles,
       speakerSlotId: null,
       currentTurnIndex: 0
     };

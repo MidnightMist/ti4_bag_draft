@@ -102,6 +102,31 @@
    - **High-Contrast Tile Numbers Overlay:** When enabled, system numbers on tiles (including Mecatol Rex) are displayed in bold white text with a crisp 4px dark stroke outline (`paintOrder="stroke fill"` and drop shadow) ensuring maximum legibility over all system art images.
    - **Left Sidebar - Interactive Map Perspective Controls:** Provides an interface allowing users to rotate the board to view the galaxy from any player's perspective (orienting that player's Home System directly to the South / bottom position $(0, 3H)$). Includes single-click player seat buttons, counter-clockwise (`↺ -60°`) and clockwise (`↻ +60°`) step rotations, and a "My Seat" shortcut.
 
+### 5-Player Map Layout & Hyperlanes:
+1. **Pre-Placed Hyperlane Tiles:**
+   - Instead of 6 player slices, 1 slice (South) is replaced by 6 fixed hyperlane tiles:
+     - `ring1-0` -> Tile **85A** (directly South of Mecatol Rex)
+     - `ring2-edge-0` -> Tile **87A** (South-West in Ring 2)
+     - `ring2-edge-5` -> Tile **88A** (South-East in Ring 2)
+     - `ring3-edge-0-1` -> Tile **84A** (South-West in Ring 3)
+     - `ring3-edge-5-2` -> Tile **83A** (South-East in Ring 3)
+     - `home-system-0` -> Tile **86A** (directly South at Ring 3)
+2. **5 Player Home System Seating:**
+   - **Player 1 (Speaker, P1):** North (`home-system-3`)
+   - **Player 2 (P2):** North-East (`home-system-4`)
+   - **Player 3 (P3):** South-East (`home-system-5`)
+   - **Player 4 (P4):** South-West (`home-system-1`)
+   - **Player 5 (P5):** North-West (`home-system-2`)
+3. **Draftable Tile Slots:**
+   - 25 draftable hexes total ($5 \text{ players} \times 5 \text{ tiles in hand} = 25$ turns).
+   - Hex `ring2-corner-0` (designated as spot **7**) is in the center of the hyperlane cluster and is a draftable Ring 2 slot.
+4. **Hyperlane Adjacency Rules (enforced in `getHexNeighbors` and `checkTileViolations`):**
+   - **Hex 1 (`ring1-1`)** and **Hex 2 (`ring1-5`)** are adjacent via hyperlane tile 85A.
+   - **Hex 7 (`ring2-corner-0`)** is adjacent to **Hex 1, 2, 3, 4, 5, and 6** via hyperlanes.
+   - **Hex 5 (`ring3-edge-0-2`)** and **Hex 4 (`ring3-edge-5-1`)** are adjacent via hyperlane tiles 84A-86A-83A.
+   - All standard physical grid adjacencies between adjacent hexes remain intact.
+   - Adjacency rules (no adjacent anomalies, no adjacent matching wormholes unless forced) strictly respect these hyperlane connections.
+
 ---
 
 ## 3. Master Tile Catalog & Expansion Sets (`tileData.js`)
