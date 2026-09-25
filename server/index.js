@@ -132,7 +132,7 @@ app.post('/api/rooms', (req, res) => {
     const {
       playerCount = 6,
       playerNames = [],
-      expansions = { pok: true, thundersEdge: false },
+      expansions = { pok: true, thundersEdge: true },
       tileMode = 'balanced', // 'random' | 'balanced'
       balanceTiers = null
     } = req.body;

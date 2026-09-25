@@ -25,7 +25,7 @@ export default function CreateRoom({ onCancel }) {
   const [showTierConfig, setShowTierConfig] = useState(false);
 
   // Balance tier defaults (blue tiles of active expansions by tier)
-  const initialDefaultTiers = getDefaultTiersForExpansions({ pok: true, thundersEdge: false });
+  const initialDefaultTiers = getDefaultTiersForExpansions({ pok: true, thundersEdge: true });
   const [tiers, setTiers] = useState({
     tier1: initialDefaultTiers.tier1.join(', '),
     tier2: initialDefaultTiers.tier2.join(', '),

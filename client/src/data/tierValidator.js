@@ -6,7 +6,7 @@ import { getActiveBlueTiles } from './blueTiles.js';
  * @param {{ pok?: boolean, thundersEdge?: boolean }} expansions
  * @returns {{ isValid: boolean, error?: string, parsed?: { tier1: number[], tier2: number[], tier3: number[] } }}
  */
-export function validateBlueTiers(rawTiers, expansions = { pok: true, thundersEdge: false }) {
+export function validateBlueTiers(rawTiers, expansions = { pok: true, thundersEdge: true }) {
   const activeBlueList = getActiveBlueTiles(expansions);
   const activeBlueSet = new Set(activeBlueList);
 
