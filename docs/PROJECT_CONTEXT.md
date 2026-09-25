@@ -93,8 +93,14 @@
      - Anomalies cannot be adjacent to other anomalies (unless no other legal placement exists).
      - Alpha wormholes cannot be adjacent to Alpha wormholes (unless forced).
      - Beta wormholes cannot be adjacent to Beta wormholes (unless forced).
-3. **Final Stage:**
-   - Completed interactive map view with shareable permalink.
+3. **Phase 5: Completed Map View & Perspective Rotation (`room.status === 'completed'`):**
+   - **Expansive Proportional Viewport Display:** When all player hand tiles are placed, the application transitions to the completed map view. Hand tiles panel, placement action bar, and bottom guide captions are removed.
+   - **Tight Hex ViewBox Framing:** In completed mode, SVG viewBox is dynamically cropped to `-348 -382 696 764` with `aspectRatio: '696 / 764'`, expanding the map so the top Home System tile sits right below the top header labels and the bottom Home System tile almost touches the bottom border of the board container.
+   - **Cleaned Home Systems:** Mini red and blue tile count badges beside home systems are automatically hidden upon completion since all hand tiles are placed on the board.
+   - **Left Sidebar - Map Creation Room Card:** Retains the compact room card with a dedicated **🔗 Copy Map Link** permalink button (`/room/:roomId`) that leads directly to the completed galaxy for players and spectators.
+   - **Left Sidebar - Show Tile Numbers Checkbox:** Includes a dedicated "Show Tile Numbers" toggle checkbox (enabled by default) allowing users to turn system numbers on and off across all placed tiles.
+   - **High-Contrast Tile Numbers Overlay:** When enabled, system numbers on tiles (including Mecatol Rex) are displayed in bold white text with a crisp 4px dark stroke outline (`paintOrder="stroke fill"` and drop shadow) ensuring maximum legibility over all system art images.
+   - **Left Sidebar - Interactive Map Perspective Controls:** Provides an interface allowing users to rotate the board to view the galaxy from any player's perspective (orienting that player's Home System directly to the South / bottom position $(0, 3H)$). Includes single-click player seat buttons, counter-clockwise (`↺ -60°`) and clockwise (`↻ +60°`) step rotations, and a "My Seat" shortcut.
 
 ---
 

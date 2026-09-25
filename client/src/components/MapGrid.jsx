@@ -59,6 +59,7 @@ function HexTile({
   onMouseEnter,
   onMouseLeave,
   cursor = 'default',
+  showTileNumber = false,
 }) {
   const [imgFailed, setImgFailed] = useState(false);
   const showImage = tileId && !imgFailed;
@@ -235,6 +236,31 @@ function HexTile({
             />
           )}
 
+          {/* High-contrast tile number overlay (white font with dark outline) */}
+          {showTileNumber && tileId && (
+            <g style={{ pointerEvents: 'none', userSelect: 'none' }}>
+              <text
+                x={0}
+                y={7}
+                textAnchor="middle"
+                fill="#ffffff"
+                stroke="#000000"
+                strokeWidth="4"
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                paintOrder="stroke fill"
+                fontSize="20"
+                fontWeight="900"
+                fontFamily="system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif"
+                style={{
+                  filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.9))',
+                }}
+              >
+                {tileId}
+              </text>
+            </g>
+          )}
+
           {/* Pending inner frame */}
           {isPending && (
             <polygon
@@ -316,33 +342,59 @@ function HomeSystemTileCountBadge({ cx, cy, blueCount = 3, redCount = 2 }) {
   );
 }
 
-export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, onSelectHex, isMyTurn, onHoverTile }) {
+export default function MapGrid({
+  room,
+  mySlot,
+  selectedTileId,
+  pendingHexId,
+  onSelectHex,
+  isMyTurn,
+  onHoverTile,
+  perspectiveSeatIndex = null,
+  isCompleted = false,
+  showTileCounts = true,
+  showTileNumbers = true,
+  isFullscreen = false,
+  onToggleFullscreen,
+}) {
+  const [zoomLevel, setZoomLevel] = useState(1);
   const mecatolTileId = getMecatolTileId(room?.settings?.expansions);
   const players = room?.players || [];
   const placedTiles = room?.mapState?.placedTiles || {};
   const activeRing = getCurrentActiveRing(placedTiles, ALL_37_HEXES);
 
-  // Rotation logic: viewer home system at bottom (South, d=0)
-  const viewerSeatIndex = mySlot ? players.findIndex(p => p.slotId === mySlot.slotId) : 0;
-  const activeViewerSeat = viewerSeatIndex >= 0 ? viewerSeatIndex : 0;
+  // Rotation logic: if perspectiveSeatIndex is explicitly passed, use it;
+  // otherwise default to viewer home system at bottom (South, d=0)
+  let activeViewerSeat = 0;
+  if (perspectiveSeatIndex !== null && perspectiveSeatIndex !== undefined) {
+    activeViewerSeat = Number(perspectiveSeatIndex);
+  } else if (mySlot) {
+    const viewerSeatIndex = players.findIndex(p => p.slotId === mySlot.slotId);
+    activeViewerSeat = viewerSeatIndex >= 0 ? viewerSeatIndex : 0;
+  }
   const theta = -activeViewerSeat * (Math.PI / 3);
   const cosT = Math.cos(theta);
   const sinT = Math.sin(theta);
+  const orientedPlayer = players[activeViewerSeat] || { name: `Player ${activeViewerSeat + 1}` };
 
   return (
     <div
       id="map-grid-container"
       style={{
         width: '100%',
-        maxWidth: '920px',
-        backgroundColor: '#11111b',
-        border: '1px solid #272738',
-        borderRadius: '16px',
-        padding: '20px 16px',
-        boxShadow: '0 8px 32px rgba(0, 0, 0, 0.5)',
+        maxWidth: isFullscreen ? '100vw' : isCompleted ? '1140px' : '920px',
+        backgroundColor: isFullscreen ? '#0a0a12' : '#11111b',
+        border: isFullscreen ? 'none' : '1px solid #272738',
+        borderRadius: isFullscreen ? '0' : '16px',
+        padding: isFullscreen ? '20px 16px' : isCompleted ? '14px 16px 6px 16px' : '20px 16px',
+        boxShadow: isFullscreen ? 'none' : '0 8px 32px rgba(0, 0, 0, 0.5)',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
+        position: isFullscreen ? 'fixed' : 'relative',
+        inset: isFullscreen ? 0 : 'auto',
+        zIndex: isFullscreen ? 9999 : 'auto',
+        overflow: isFullscreen ? 'auto' : 'visible',
       }}
     >
       {/* Board Header Bar */}
@@ -352,30 +404,127 @@ export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, on
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '8px',
+          marginBottom: isCompleted ? '4px' : '10px',
           padding: '0 8px',
+          flexWrap: 'wrap',
+          gap: '8px',
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <span style={{ fontSize: '18px' }}>🌌</span>
-          <h3 style={{ margin: 0, fontSize: '18px', color: '#f3f4f6', fontWeight: '700' }}>
-            Twilight Galaxy (Active Ring: {activeRing})
+          <h3 style={{ margin: 0, fontSize: isCompleted ? '19px' : '18px', color: '#f3f4f6', fontWeight: '700' }}>
+            {isCompleted ? 'Twilight Galaxy Map' : `Twilight Galaxy (Active Ring: ${activeRing})`}
           </h3>
+          {isCompleted && (
+            <span style={{ fontSize: '11px', color: '#34d399', backgroundColor: '#064e3b', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+              ✓ Complete
+            </span>
+          )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
           <span
             style={{
-              fontSize: '11px',
+              fontSize: '12px',
               color: '#34d399',
               backgroundColor: '#064e3b',
-              padding: '3px 8px',
+              padding: '4px 10px',
               borderRadius: '6px',
               fontWeight: '600',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
             }}
           >
-            Oriented to: {mySlot ? mySlot.name : 'Player 1'}
+            <span>🧭 Oriented to:</span>
+            <strong style={{ color: '#fff' }}>{orientedPlayer.name}</strong>
+            <span style={{ fontSize: '10px', color: '#a7f3d0' }}>(South)</span>
           </span>
+
+          {/* Zoom & Fullscreen Controls */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#1c1c2b', padding: '3px', borderRadius: '6px', border: '1px solid #323248' }}>
+            <button
+              onClick={() => setZoomLevel(z => Math.max(0.7, Math.round((z - 0.1) * 10) / 10))}
+              disabled={zoomLevel <= 0.7}
+              style={{
+                backgroundColor: '#272738',
+                border: 'none',
+                color: zoomLevel <= 0.7 ? '#4b5563' : '#d1d5db',
+                borderRadius: '4px',
+                width: '24px',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: zoomLevel <= 0.7 ? 'not-allowed' : 'pointer',
+                fontWeight: 'bold',
+                fontSize: '13px',
+              }}
+              title="Zoom Out"
+            >
+              -
+            </button>
+            <button
+              onClick={() => setZoomLevel(1)}
+              style={{
+                backgroundColor: 'transparent',
+                border: 'none',
+                color: '#9ca3af',
+                fontSize: '11px',
+                padding: '0 4px',
+                cursor: 'pointer',
+              }}
+              title="Reset Zoom"
+            >
+              {Math.round(zoomLevel * 100)}%
+            </button>
+            <button
+              onClick={() => setZoomLevel(z => Math.min(1.8, Math.round((z + 0.1) * 10) / 10))}
+              disabled={zoomLevel >= 1.8}
+              style={{
+                backgroundColor: '#272738',
+                border: 'none',
+                color: zoomLevel >= 1.8 ? '#4b5563' : '#d1d5db',
+                borderRadius: '4px',
+                width: '24px',
+                height: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: zoomLevel >= 1.8 ? 'not-allowed' : 'pointer',
+                fontWeight: 'bold',
+                fontSize: '13px',
+              }}
+              title="Zoom In"
+            >
+              +
+            </button>
+          </div>
+
+          {onToggleFullscreen && (
+            <button
+              id="map-toggle-fullscreen-btn"
+              onClick={onToggleFullscreen}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '5px 10px',
+                backgroundColor: isFullscreen ? '#dc2626' : '#2563eb',
+                color: '#fff',
+                border: 'none',
+                borderRadius: '6px',
+                fontSize: '12px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              title={isFullscreen ? 'Exit Fullscreen' : 'View Fullscreen Map'}
+            >
+              <span>{isFullscreen ? '✕' : '⛶'}</span>
+              <span>{isFullscreen ? 'Exit' : 'Fullscreen'}</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -390,13 +539,16 @@ export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, on
         }}
       >
         <svg
-          viewBox="-440 -440 880 880"
+          viewBox={isCompleted ? "-348 -382 696 764" : "-440 -440 880 880"}
           style={{
             width: '100%',
-            maxWidth: '880px',
+            maxWidth: isFullscreen ? '94vh' : isCompleted ? '1060px' : '880px',
             height: 'auto',
-            aspectRatio: '1 / 1',
+            aspectRatio: isCompleted ? '696 / 764' : '1 / 1',
             display: 'block',
+            transform: `scale(${zoomLevel})`,
+            transformOrigin: 'center center',
+            transition: 'transform 0.15s ease-out',
           }}
         >
           <defs>
@@ -439,6 +591,7 @@ export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, on
                   fill="url(#mecatol-grad)"
                   stroke="#c084fc"
                   strokeWidth={2.5}
+                  showTileNumber={isCompleted && showTileNumbers}
                 />
               );
             }
@@ -449,6 +602,7 @@ export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, on
                 slotId: hex.seatIndex,
               };
               const isViewer = mySlot && mySlot.slotId === player.slotId;
+              const isOrientedSeat = hex.seatIndex === activeViewerSeat;
               const blueCount = player.remainingBlue ?? player.hand?.blue?.length ?? 3;
               const redCount = player.remainingRed ?? player.hand?.red?.length ?? 2;
 
@@ -459,15 +613,17 @@ export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, on
                     cy={ry}
                     isHomeSystem={true}
                     playerName={player.name}
-                    isViewer={isViewer}
+                    isViewer={isViewer || isOrientedSeat}
                     isSpeaker={!!player.isSpeaker}
                   />
-                  <HomeSystemTileCountBadge
-                    cx={rx}
-                    cy={ry}
-                    blueCount={blueCount}
-                    redCount={redCount}
-                  />
+                  {showTileCounts && !isCompleted && (
+                    <HomeSystemTileCountBadge
+                      cx={rx}
+                      cy={ry}
+                      blueCount={blueCount}
+                      redCount={redCount}
+                    />
+                  )}
                 </g>
               );
             }
@@ -487,6 +643,7 @@ export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, on
                   strokeWidth={1}
                   onMouseEnter={() => onHoverTile && onHoverTile(placed.tileId)}
                   onMouseLeave={() => onHoverTile && onHoverTile(null)}
+                  showTileNumber={isCompleted && showTileNumbers}
                 />
               );
             }
@@ -537,12 +694,14 @@ export default function MapGrid({ room, mySlot, selectedTileId, pendingHexId, on
         </svg>
       </div>
 
-      {/* Board Guide Note */}
-      <div style={{ marginTop: '6px', fontSize: '11px', color: '#6b7280', textAlign: 'center' }}>
-        {isMyTurn && selectedTileId
-          ? 'Click an active ring hex to place your selected tile, then click Accept.'
-          : 'Green tiles: Home Systems • Blue/Red badges: Remaining tiles in hand'}
-      </div>
+      {/* Board Guide Note (only shown during active draft, hidden when completed) */}
+      {!isCompleted && (
+        <div style={{ marginTop: '6px', fontSize: '11px', color: '#6b7280', textAlign: 'center' }}>
+          {isMyTurn && selectedTileId
+            ? 'Click an active ring hex to place your selected tile, then click Accept.'
+            : 'Green tiles: Home Systems • Blue/Red badges: Remaining tiles in hand'}
+        </div>
+      )}
     </div>
   );
 }

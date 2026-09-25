@@ -22,6 +22,9 @@ export default function RoomView() {
   const [selectedTileId, setSelectedTileId] = useState(null);
   const [pendingHexId, setPendingHexId] = useState(null);
   const [hoveredTileId, setHoveredTileId] = useState(null);
+  const [selectedPerspectiveSeat, setSelectedPerspectiveSeat] = useState(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showTileNumbers, setShowTileNumbers] = useState(true);
 
   useEffect(() => {
     if (!actionError) return;
@@ -103,10 +106,10 @@ export default function RoomView() {
   };
 
   const copyRoomUrl = () => {
-    const url = window.location.href;
+    const url = room?.id ? `${window.location.origin}/room/${room.id}` : window.location.href;
     navigator.clipboard.writeText(url).then(() => {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => setCopied(false), 2500);
     }).catch(() => {
       prompt('Copy room link:', url);
     });
@@ -146,7 +149,12 @@ export default function RoomView() {
   const totalSlots = room.players.length;
   const claimedCount = room.players.filter((p) => p.claimedBy !== null).length;
   const isLobby = room.status === 'lobby';
+  const isCompleted = room.status === 'completed';
   const speaker = room.players.find((p) => p.isSpeaker);
+
+  // Perspective calculation: default to viewer's claimed seat, or seat 0 (Player 1)
+  const defaultPerspectiveSeat = myClaimedSlot ? room.players.findIndex(p => p.slotId === myClaimedSlot.slotId) : 0;
+  const activePerspectiveSeat = selectedPerspectiveSeat !== null ? selectedPerspectiveSeat : (defaultPerspectiveSeat >= 0 ? defaultPerspectiveSeat : 0);
 
   // Turn calculation
   const currentTurnIndex = room.mapState?.currentTurnIndex || 0;
@@ -178,7 +186,7 @@ export default function RoomView() {
   };
 
   return (
-    <div id="room-page" style={roomContainerStyle}>
+    <div id="room-page" style={roomContainerStyle(isCompleted)}>
       {/* Dev Debugging Toolbar */}
       <DevToolbar
         room={room}
@@ -333,6 +341,351 @@ export default function RoomView() {
             </div>
           </div>
         </>
+      ) : isCompleted ? (
+        /* COMPLETED MAP VIEW:
+           Full-screen spacious galaxy layout.
+           Left sidebar with "Map Creation Room" card (permalink button) and "Rotate Perspective" controls.
+           Right main column with expanded high-resolution map without mini badges.
+        */
+        <div id="completed-map-container" style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+          {/* Left Sidebar: Room info + Perspective Rotation controls */}
+          <aside
+            id="completed-map-sidebar"
+            style={{
+              width: '320px',
+              flexShrink: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+            }}
+          >
+            {/* Block 1: Map Creation Room Card with shareable link */}
+            <div
+              id="completed-room-header"
+              style={{
+                backgroundColor: '#171724',
+                border: '1px solid #28283c',
+                borderRadius: '14px',
+                padding: '18px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>
+                  Map Creation Room
+                </span>
+                <span style={{ fontSize: '11px', color: '#34d399', backgroundColor: '#064e3b', padding: '3px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                  ✓ Completed
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#f3f4f6', fontFamily: 'monospace' }}>
+                  ID: <span style={{ color: '#60a5fa' }}>{room.id}</span>
+                </span>
+              </div>
+
+              {/* Direct Permalink Button leading to this completed map */}
+              <div style={{ marginTop: '14px' }}>
+                <button
+                  id="copy-map-link-btn"
+                  onClick={copyRoomUrl}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    padding: '11px 16px',
+                    backgroundColor: copied ? '#059669' : '#2563eb',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    boxShadow: '0 2px 10px rgba(37, 99, 235, 0.35)',
+                    transition: 'all 0.15s ease',
+                  }}
+                >
+                  {copied ? '✓ Link Copied!' : '🔗 Copy Map Link'}
+                </button>
+                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '6px', textAlign: 'center' }}>
+                  Share this permalink to view the completed galaxy
+                </div>
+              </div>
+
+              {/* Badges */}
+              <div style={{ display: 'flex', gap: '6px', marginTop: '14px', flexWrap: 'wrap' }}>
+                <span style={miniChipStyle}>👥 {totalSlots} Players</span>
+                <span style={miniChipStyle}>
+                  {room.settings.tileMode === 'balanced' ? '⚖️ Balanced' : '🎲 Random'}
+                </span>
+                {room.settings.expansions.pok && <span style={miniChipStyle}>📦 PoK</span>}
+                {room.settings.expansions.thundersEdge && <span style={miniChipStyle}>⚡ Thunder's Edge</span>}
+                <span style={{ ...miniChipStyle, backgroundColor: '#064e3b', color: '#a7f3d0' }}>
+                  🌌 37 Systems
+                </span>
+              </div>
+            </div>
+
+            {/* Block 2: Tile Numbers Display Toggle Checkbox */}
+            <div
+              id="display-options-card"
+              style={{
+                backgroundColor: '#171724',
+                border: '1px solid #28283c',
+                borderRadius: '14px',
+                padding: '14px 18px',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+              }}
+            >
+              <label
+                htmlFor="toggle-tile-numbers-checkbox"
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  cursor: 'pointer',
+                  userSelect: 'none',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '18px' }}>🔢</span>
+                  <div>
+                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#f3f4f6' }}>
+                      Show Tile Numbers
+                    </div>
+                    <div style={{ fontSize: '11px', color: '#9ca3af' }}>
+                      Overlay system numbers on tiles
+                    </div>
+                  </div>
+                </div>
+                <input
+                  type="checkbox"
+                  id="toggle-tile-numbers-checkbox"
+                  checked={showTileNumbers}
+                  onChange={(e) => setShowTileNumbers(e.target.checked)}
+                  style={{
+                    width: '18px',
+                    height: '18px',
+                    accentColor: '#2563eb',
+                    cursor: 'pointer',
+                  }}
+                />
+              </label>
+            </div>
+
+            {/* Block 3: Perspective / Rotate View Interface */}
+            <div
+              id="perspective-selector-card"
+              style={{
+                backgroundColor: '#171724',
+                border: '1px solid #28283c',
+                borderRadius: '14px',
+                padding: '18px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '15px' }}>🧭</span>
+                  <span style={{ fontSize: '12px', color: '#f3f4f6', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    Map Perspective
+                  </span>
+                </div>
+                <span style={{ fontSize: '11px', color: '#9ca3af' }}>
+                  Rotate View
+                </span>
+              </div>
+
+              <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px', lineHeight: '1.4' }}>
+                Choose a player to view the galaxy from their seat (their home system rotates to the bottom):
+              </div>
+
+              {/* Player Perspective Buttons */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {room.players.map((player, seatIdx) => {
+                  const isOriented = activePerspectiveSeat === seatIdx;
+                  const isViewer = myClaimedSlot && myClaimedSlot.slotId === player.slotId;
+
+                  return (
+                    <button
+                      key={player.slotId ?? seatIdx}
+                      id={`perspective-btn-${seatIdx}`}
+                      onClick={() => setSelectedPerspectiveSeat(seatIdx)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '10px 12px',
+                        backgroundColor: isOriented ? '#064e3b' : '#1f1f2e',
+                        border: isOriented ? '1.5px solid #10b981' : '1px solid #2f2f45',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        color: isOriented ? '#ecfdf5' : '#d1d5db',
+                        fontWeight: isOriented ? '700' : '500',
+                        fontSize: '13px',
+                        transition: 'all 0.15s ease',
+                        boxShadow: isOriented ? '0 0 12px rgba(16, 185, 129, 0.35)' : 'none',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ color: isOriented ? '#34d399' : '#6b7280', fontSize: '12px', fontFamily: 'monospace' }}>
+                          #{seatIdx + 1}
+                        </span>
+                        <span>{player.name}</span>
+                        {player.isSpeaker && <span title="Speaker">👑</span>}
+                        {isViewer && (
+                          <span style={{ fontSize: '9px', backgroundColor: '#2563eb', padding: '1px 5px', borderRadius: '4px', color: '#fff', fontWeight: 'bold' }}>
+                            YOU
+                          </span>
+                        )}
+                      </div>
+
+                      {isOriented ? (
+                        <span style={{ fontSize: '11px', color: '#6ee7b7', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                          ✓ South
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: '#6b7280' }}>
+                          View ↷
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Step Rotation Row */}
+              <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
+                <button
+                  id="rotate-ccw-btn"
+                  onClick={() => setSelectedPerspectiveSeat((prev) => {
+                    const cur = prev !== null ? prev : activePerspectiveSeat;
+                    return (cur + 5) % (room.players.length || 6);
+                  })}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    backgroundColor: '#242436',
+                    border: '1px solid #374151',
+                    borderRadius: '6px',
+                    color: '#e5e7eb',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                  title="Rotate 60° Counter-Clockwise"
+                >
+                  ↺ -60°
+                </button>
+
+                <button
+                  id="rotate-cw-btn"
+                  onClick={() => setSelectedPerspectiveSeat((prev) => {
+                    const cur = prev !== null ? prev : activePerspectiveSeat;
+                    return (cur + 1) % (room.players.length || 6);
+                  })}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    backgroundColor: '#242436',
+                    border: '1px solid #374151',
+                    borderRadius: '6px',
+                    color: '#e5e7eb',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                  }}
+                  title="Rotate 60° Clockwise"
+                >
+                  ↻ +60°
+                </button>
+
+                {myClaimedSlot && (
+                  <button
+                    id="rotate-reset-btn"
+                    onClick={() => {
+                      const myIdx = room.players.findIndex(p => p.slotId === myClaimedSlot.slotId);
+                      if (myIdx >= 0) setSelectedPerspectiveSeat(myIdx);
+                    }}
+                    style={{
+                      padding: '8px 10px',
+                      backgroundColor: '#1e3a8a',
+                      border: '1px solid #3b82f6',
+                      borderRadius: '6px',
+                      color: '#bfdbfe',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                    }}
+                    title="Reset orientation to your seat"
+                  >
+                    My Seat
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Block 3: Map Summary Details */}
+            <div
+              id="completed-summary-card"
+              style={{
+                backgroundColor: '#171724',
+                border: '1px solid #28283c',
+                borderRadius: '14px',
+                padding: '16px',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+              }}
+            >
+              <div style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700', marginBottom: '8px' }}>
+                Galaxy Details
+              </div>
+              <div style={{ fontSize: '13px', color: '#d1d5db', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#9ca3af' }}>Speaker:</span>
+                  <strong style={{ color: '#fbbf24' }}>👑 {speaker?.name || 'Player 1'}</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#9ca3af' }}>Tiles Placed:</span>
+                  <strong style={{ color: '#34d399' }}>{Object.keys(room.mapState?.placedTiles || {}).length} tiles</strong>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#9ca3af' }}>Rings Completed:</span>
+                  <strong style={{ color: '#60a5fa' }}>3 / 3 Rings</strong>
+                </div>
+              </div>
+            </div>
+          </aside>
+
+          {/* MAIN COLUMN: Expansive Full Map */}
+          <main
+            id="completed-map-main"
+            style={{
+              flex: 1,
+              minWidth: '550px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}
+          >
+            <MapGrid
+              room={room}
+              mySlot={myClaimedSlot}
+              selectedTileId={null}
+              pendingHexId={null}
+              isMyTurn={false}
+              onHoverTile={setHoveredTileId}
+              perspectiveSeatIndex={activePerspectiveSeat}
+              isCompleted={true}
+              showTileCounts={false}
+              showTileNumbers={showTileNumbers}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
+            />
+          </main>
+        </div>
       ) : (
         /* ACTIVE MAP BUILDING VIEW:
            Two-column layout shifting the two top blocks to a compact sidebar,
@@ -630,6 +983,11 @@ export default function RoomView() {
               }}
               isMyTurn={isMyTurn}
               onHoverTile={setHoveredTileId}
+              perspectiveSeatIndex={activePerspectiveSeat}
+              isCompleted={false}
+              showTileCounts={true}
+              isFullscreen={isFullscreen}
+              onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
             />
 
             {/* Placement Action Bar with Accept button */}
@@ -739,11 +1097,11 @@ export default function RoomView() {
   );
 }
 
-const roomContainerStyle = {
-  maxWidth: '1600px',
+const roomContainerStyle = (isCompleted) => ({
+  maxWidth: isCompleted ? '1750px' : '1600px',
   margin: '0 auto',
   padding: '16px',
-};
+});
 
 const headerCardStyle = {
   backgroundColor: '#1e1e2d',

@@ -400,6 +400,47 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('room_state', room);
   });
 
+  // DEV TOOLBAR: Instantly complete map by placing remaining tiles
+  socket.on('dev_complete_map', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.status !== 'map_building') return;
+
+    // Collect all remaining hand tiles
+    const remainingHandTiles = [];
+    room.players.forEach(p => {
+      if (p.hand) {
+        (p.hand.blue || []).forEach(t => remainingHandTiles.push({ tileId: t, slotId: p.slotId, type: 'blue' }));
+        (p.hand.red || []).forEach(t => remainingHandTiles.push({ tileId: t, slotId: p.slotId, type: 'red' }));
+        p.hand.blue = [];
+        p.hand.red = [];
+        p.remainingBlue = 0;
+        p.remainingRed = 0;
+      }
+    });
+
+    // Find all empty hexes in ring 1, ring 2, ring 3
+    const emptyHexes = ALL_37_HEXES.filter(h => {
+      if (h.type === 'center' || h.type === 'home_system') return false;
+      return !room.mapState.placedTiles[h.id];
+    });
+
+    emptyHexes.forEach((hex, idx) => {
+      if (idx < remainingHandTiles.length) {
+        const item = remainingHandTiles[idx];
+        room.mapState.placedTiles[hex.id] = {
+          tileId: item.tileId,
+          slotId: item.slotId,
+          type: item.type
+        };
+      }
+    });
+
+    room.mapState.currentTurnIndex = room.players.length * 5;
+    room.status = 'completed';
+
+    io.to(roomId).emit('room_state', room);
+  });
+
   // DEV TOOLBAR: Reset room back to lobby and clear all claims
   socket.on('dev_reset_room', ({ roomId }) => {
     const room = rooms.get(roomId);

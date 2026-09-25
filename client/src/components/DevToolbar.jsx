@@ -26,6 +26,11 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
     socket.emit('dev_reset_room', { roomId: room.id });
   };
 
+  const handleCompleteMap = () => {
+    if (!socket) return;
+    socket.emit('dev_complete_map', { roomId: room.id });
+  };
+
   const handleOpenPlayerTab = (slotIndex) => {
     const targetUrl = `${window.location.origin}/room/${room.id}?user=p${slotIndex + 1}`;
     window.open(targetUrl, `_blank`);
@@ -95,6 +100,17 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
             >
               ⚡ Auto-Fill Lobby & Start Draft
             </button>
+
+            {room.status === 'map_building' && (
+              <button
+                id="dev-complete-map-btn"
+                onClick={handleCompleteMap}
+                style={actionBtnStyle('#059669', '#047857')}
+                title="Immediately completes map creation with remaining tiles"
+              >
+                🏁 Fast-Forward & Complete Map
+              </button>
+            )}
 
             <button
               id="dev-reset-btn"
