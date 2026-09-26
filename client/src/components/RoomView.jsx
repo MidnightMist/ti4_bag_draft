@@ -19,12 +19,17 @@ export default function RoomView() {
   const [actionError, setActionError] = useState(null);
   const [socket, setSocket] = useState(null);
   const [copied, setCopied] = useState(false);
-  const [selectedTileId, setSelectedTileId] = useState(null);
-  const [pendingHexId, setPendingHexId] = useState(null);
+  // Draft selections kept per player slot: slotId -> { selectedTileId, pendingHexId }
+  const [slotDrafts, setSlotDrafts] = useState({});
   const [hoveredTileId, setHoveredTileId] = useState(null);
   const [selectedPerspectiveSeat, setSelectedPerspectiveSeat] = useState(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showTileNumbers, setShowTileNumbers] = useState(true);
+
+  // Clear draft previews whenever turn advances or room status transitions
+  useEffect(() => {
+    setSlotDrafts({});
+  }, [room?.mapState?.currentTurnIndex, room?.status]);
 
   useEffect(() => {
     if (!actionError) return;
@@ -168,9 +173,15 @@ export default function RoomView() {
   // Turn calculation
   const currentTurnIndex = room.mapState?.currentTurnIndex || 0;
   const currentTurnPlayer = getPlayerForTurn(room.players, currentTurnIndex);
-  const isMyTurn = myClaimedSlot && currentTurnPlayer && currentTurnPlayer.slotId === myClaimedSlot.slotId;
+  const isMyTurn = Boolean(myClaimedSlot && currentTurnPlayer && currentTurnPlayer.slotId === myClaimedSlot.slotId);
   const activeHexes = getActiveHexes(totalSlots);
   const activeRing = getCurrentActiveRing(room.mapState?.placedTiles || {}, activeHexes);
+
+  // Private draft preview: only the player whose turn it is sees their tentative placement
+  const currentSlotId = myClaimedSlot?.slotId;
+  const currentDraft = (currentSlotId !== undefined && slotDrafts[currentSlotId]) || { selectedTileId: null, pendingHexId: null };
+  const selectedTileId = isMyTurn ? currentDraft.selectedTileId : null;
+  const pendingHexId = isMyTurn ? currentDraft.pendingHexId : null;
 
   // Validate pending placement if tile and hex selected
   let pendingValidation = null;
@@ -180,6 +191,38 @@ export default function RoomView() {
       pendingValidation = validatePlacement(room.mapState?.placedTiles || {}, targetHex, selectedTileId, activeRing, activeHexes, currentTurnPlayer, totalSlots);
     }
   }
+
+  const handleSelectTile = (tileId) => {
+    if (!isMyTurn || currentSlotId === undefined) return;
+    setActionError(null);
+    setSlotDrafts((prev) => ({
+      ...prev,
+      [currentSlotId]: {
+        selectedTileId: tileId,
+        pendingHexId: null,
+      }
+    }));
+  };
+
+  const handleSelectHex = (hexId) => {
+    if (!isMyTurn || currentSlotId === undefined || !selectedTileId) return;
+    setActionError(null);
+    setSlotDrafts((prev) => ({
+      ...prev,
+      [currentSlotId]: {
+        selectedTileId,
+        pendingHexId: hexId,
+      }
+    }));
+  };
+
+  const handleCancelPlacement = () => {
+    if (currentSlotId === undefined) return;
+    setSlotDrafts((prev) => ({
+      ...prev,
+      [currentSlotId]: { selectedTileId: null, pendingHexId: null }
+    }));
+  };
 
   const handleAcceptPlacement = () => {
     if (!socket || !myClaimedSlot || !selectedTileId || !pendingHexId) return;
@@ -191,8 +234,10 @@ export default function RoomView() {
       hexId: pendingHexId
     });
     // Reset selection locally upon sending
-    setSelectedTileId(null);
-    setPendingHexId(null);
+    setSlotDrafts((prev) => ({
+      ...prev,
+      [myClaimedSlot.slotId]: { selectedTileId: null, pendingHexId: null }
+    }));
   };
 
   return (
@@ -888,25 +933,58 @@ export default function RoomView() {
                 <span style={{ fontSize: '10px', color: '#6b7280' }}>Remaining Hand</span>
               </div>
 
+              {selectedPerspectiveSeat !== null && (
+                <div style={{ marginBottom: '8px' }}>
+                  <button
+                    onClick={() => setSelectedPerspectiveSeat(null)}
+                    style={{
+                      width: '100%',
+                      backgroundColor: '#1f2937',
+                      color: '#93c5fd',
+                      border: '1px solid #374151',
+                      borderRadius: '6px',
+                      padding: '5px 8px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '4px',
+                    }}
+                  >
+                    <span>↺</span> Reset View to My Seat
+                  </button>
+                </div>
+              )}
+
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {room.players.map((p) => {
+                {room.players.map((p, playerIdx) => {
                   const isMe = Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId;
                   const initialBlue = totalSlots === 3 ? 6 : 3;
                   const blueCount = p.remainingBlue ?? p.hand?.blue?.length ?? initialBlue;
                   const redCount = p.remainingRed ?? p.hand?.red?.length ?? 2;
+                  const targetSeat = (totalSlots === 5 || totalSlots === 4 || totalSlots === 3)
+                    ? getSeatIndexForPlayer(playerIdx, totalSlots)
+                    : playerIdx;
+                  const isOriented = activePerspectiveSeat === targetSeat;
 
                   return (
                     <div
                       key={p.slotId}
+                      onClick={() => setSelectedPerspectiveSeat(targetSeat)}
                       style={{
-                        backgroundColor: isMe ? '#1e293b' : '#11111b',
-                        border: `1px solid ${isMe ? '#3b82f6' : '#272738'}`,
+                        backgroundColor: isMe ? '#1e293b' : isOriented ? '#162032' : '#11111b',
+                        border: `1px solid ${isMe ? '#3b82f6' : isOriented ? '#10b981' : '#272738'}`,
                         borderRadius: '8px',
                         padding: '8px 10px',
                         display: 'flex',
                         justifyContent: 'space-between',
                         alignItems: 'center',
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease',
                       }}
+                      title={`Click to view board from ${p.name}'s seat`}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {p.isSpeaker && <span title="Speaker token">👑</span>}
@@ -916,6 +994,11 @@ export default function RoomView() {
                         {isMe && (
                           <span style={{ fontSize: '9px', backgroundColor: '#2563eb', padding: '1px 5px', borderRadius: '4px', color: '#fff', fontWeight: 'bold' }}>
                             YOU
+                          </span>
+                        )}
+                        {isOriented && !isMe && (
+                          <span style={{ fontSize: '9px', backgroundColor: '#064e3b', padding: '1px 5px', borderRadius: '4px', color: '#34d399', fontWeight: 'bold' }}>
+                            VIEWING
                           </span>
                         )}
                       </div>
@@ -1022,12 +1105,7 @@ export default function RoomView() {
               mySlot={myClaimedSlot}
               selectedTileId={selectedTileId}
               pendingHexId={pendingHexId}
-              onSelectHex={(hexId) => {
-                if (isMyTurn && selectedTileId) {
-                  setActionError(null);
-                  setPendingHexId(hexId);
-                }
-              }}
+              onSelectHex={handleSelectHex}
               isMyTurn={isMyTurn}
               onHoverTile={setHoveredTileId}
               perspectiveSeatIndex={activePerspectiveSeat}
@@ -1083,7 +1161,7 @@ export default function RoomView() {
 
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <button
-                    onClick={() => { setSelectedTileId(null); setPendingHexId(null); }}
+                    onClick={handleCancelPlacement}
                     style={{
                       backgroundColor: '#374151',
                       color: '#d1d5db',
@@ -1125,13 +1203,7 @@ export default function RoomView() {
             <PlayerHandPanel
               player={myClaimedSlot}
               activeTileId={selectedTileId}
-              onSelectTile={(tileId) => {
-                if (isMyTurn) {
-                  setActionError(null);
-                  setSelectedTileId(tileId);
-                  setPendingHexId(null);
-                }
-              }}
+              onSelectTile={handleSelectTile}
               onHoverTile={setHoveredTileId}
             />
           </main>

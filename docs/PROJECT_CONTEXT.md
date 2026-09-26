@@ -86,8 +86,13 @@
 ### Phase 4: Draft / Placement Sequence (Snake Order):
 1. **Draft Order:**
    - Starting from the Speaker: `1 -> 2 -> ... -> N -> N -> ... -> 2 -> 1 -> 1 -> ...`
-   - Active player selects a tile from hand, clicks an available valid hex, reviews validation, and confirms with "Apply".
-2. **Hex Placement Rules:**
+   - Active player selects a tile from hand, clicks an available valid hex, reviews validation, and confirms with "Accept".
+2. **Private Placement Preview (Local Trial Mode):**
+   - When the active player selects a tile and selects a destination hex, the tentative placement preview is displayed **strictly on that player's screen**.
+   - Other players (and spectators) see only the confirmed galaxy state and legal empty ring hexes; unconfirmed candidate placements are never broadcast or shown to opponents.
+   - When switching perspective views or switching active seats in DevToolbar, preview state is isolated per player slot and hidden for non-active players (`isMyTurn: false`).
+   - Confirmed placement occurs only when the active player clicks **"Accept"**, which emits `place_tile` to the server and broadcasts the updated `room_state` to all participants.
+3. **Hex Placement Rules:**
    - **Rings Order:** Ring 1 (around Mecatol Rex) must be fully completed before Ring 2 can be placed. Ring 2 must be fully completed before Ring 3.
    - **Adjacency Restrictions:**
      - Anomalies cannot be adjacent to other anomalies (unless no other legal placement exists).

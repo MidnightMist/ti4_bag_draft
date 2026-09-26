@@ -661,7 +661,7 @@ export default function MapGrid({
             }
 
             if (placed) {
-              const isPending = pendingHexId === hex.id;
+              const isPending = Boolean(isMyTurn && selectedTileId && pendingHexId === hex.id);
               const isHyperlane = placed.isHyperlane;
               // Hyperlane tiles keep base rotation defined in tile data plus counter-rotation by -activeViewerSeat * 60 degrees
               const baseHyperlaneRotation = placed.rotation || 0;
@@ -689,7 +689,7 @@ export default function MapGrid({
 
             // Empty Hex Slot
             const isActiveRingHex = hex.ring === activeRing && (hex.ring !== 3 || hex.type === 'ring3');
-            const isPending = pendingHexId === hex.id;
+            const isPending = Boolean(isMyTurn && selectedTileId && pendingHexId === hex.id);
             const isClickable = isMyTurn && selectedTileId && isActiveRingHex;
 
             let fill = hex.ring === 1 ? '#141424' : hex.ring === 2 ? '#12121e' : '#10101a';
