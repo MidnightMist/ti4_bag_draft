@@ -102,6 +102,28 @@
    - **High-Contrast Tile Numbers Overlay:** When enabled, system numbers on tiles (including Mecatol Rex) are displayed in bold white text with a crisp 4px dark stroke outline (`paintOrder="stroke fill"` and drop shadow) ensuring maximum legibility over all system art images.
    - **Left Sidebar - Interactive Map Perspective Controls:** Provides an interface allowing users to rotate the board to view the galaxy from any player's perspective (orienting that player's Home System directly to the South / bottom position $(0, 3H)$). Includes single-click player seat buttons, counter-clockwise (`↺ -60°`) and clockwise (`↻ +60°`) step rotations, and a "My Seat" shortcut.
 
+### 4-Player Map Layout & Hyperlanes:
+1. **Pre-Placed Fixed Hyperlane Tiles:**
+   - Hyperlanes are placed on both the South corridor ($d = 0$) and the North corridor ($d = 3$ rotated 180°):
+     - **South Corridor ($d = 0$):** `ring1-0` (85A), `ring2-edge-0` (87A), `ring2-edge-5` (88A), `ring3-edge-0-1` (84A), `ring3-edge-5-2` (83A), `home-system-0` (86A).
+     - **North Corridor ($d = 3$):** `ring1-3` (85A rotated 180°), `ring2-edge-3` (87A rotated 180°), `ring2-edge-2` (88A rotated 180°), `ring3-edge-3-1` (84A rotated 180°), `ring3-edge-2-2` (83A rotated 180°), `home-system-3` (86A rotated 180°).
+2. **4 Player Home System Seating:**
+   - **Player 1 (Speaker, P1):** North-East (`home-system-4`, Seat 4)
+   - **Player 2 (P2):** South-East (`home-system-5`, Seat 5)
+   - **Player 3 (P3):** South-West (`home-system-1`, Seat 1)
+   - **Player 4 (P4):** North-West (`home-system-2`, Seat 2)
+   - **Seat 0 & Seat 3:** Fixed Hyperlane tiles (Tile 86A).
+   - Seat mappings defined by `FOUR_PLAYER_SEAT_TO_PLAYER_INDEX` and `FOUR_PLAYER_PLAYER_TO_SEAT_INDEX`.
+3. **Draftable Tile Slots & Turns:**
+   - 20 draftable hexes total ($4 \text{ players} \times 5 \text{ tiles in hand} = 20$ turns):
+     - Ring 1: 4 playable hexes + 2 hyperlanes = 6 hexes.
+     - Ring 2: 8 playable hexes + 4 hyperlanes = 12 hexes.
+     - Ring 3: 8 playable edge hexes + 4 hyperlane edges + 2 hyperlane home systems + 4 player home systems = 18 hexes.
+4. **Hyperlane Adjacency Rules:**
+   - South corridor connects `ring1-1`, `ring1-5`, and `ring2-corner-0`, with outer connections between `ring3-edge-5-1` and `ring3-edge-0-2`.
+   - North corridor connects `ring1-2`, `ring1-4`, and `ring2-corner-3`, with outer connections between `ring3-edge-2-2` and `ring3-edge-3-1`/`ring3-edge-3-2`.
+   - Adjacency checks (anomalies and matching wormholes) adhere to these corridor networks.
+
 ### 5-Player Map Layout & Hyperlanes:
 1. **Pre-Placed Hyperlane Tiles:**
    - Instead of 6 player slices, 1 slice (South) is replaced by 6 fixed hyperlane tiles:

@@ -233,6 +233,35 @@ export const THREE_PLAYER_PLAYER_TO_SEAT_INDEX = {
   2: 2,
 };
 
+// 4-player seat mapping:
+// Seat 4: North-East -> Player 1 (Index 0, Speaker)
+// Seat 5: South-East -> Player 2 (Index 1)
+// Seat 1: South-West -> Player 3 (Index 2)
+// Seat 2: North-West -> Player 4 (Index 3)
+// Seat 0: South -> Hyperlane tile 86A
+// Seat 3: North -> Hyperlane tile 86A
+export const FOUR_PLAYER_SEAT_TO_PLAYER_INDEX = {
+  4: 0,
+  5: 1,
+  1: 2,
+  2: 3,
+};
+
+export const FOUR_PLAYER_PLAYER_TO_SEAT_INDEX = {
+  0: 4,
+  1: 5,
+  2: 1,
+  3: 2,
+};
+
+// Pre-placed home systems for 4-player galaxy map
+export const FOUR_PLAYER_HOME_SYSTEMS = {
+  'home-system-4': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 4, playerIndex: 0 },
+  'home-system-5': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 5, playerIndex: 1 },
+  'home-system-1': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 1, playerIndex: 2 },
+  'home-system-2': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 2, playerIndex: 3 },
+};
+
 // 5-player seat mapping:
 // Seat 3: North -> Player 1 (Index 0, Speaker)
 // Seat 4: North-East -> Player 2 (Index 1)

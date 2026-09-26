@@ -537,7 +537,7 @@ export default function RoomView() {
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span>🌌</span>
-                      <span>Overview (Hyperlanes South)</span>
+                      <span>{totalSlots === 4 ? 'Overview (Hyperlanes South/North)' : 'Overview (Hyperlanes South)'}</span>
                     </div>
                     {activePerspectiveSeat === 0 ? (
                       <span style={{ fontSize: '11px', color: '#6ee7b7', fontWeight: 'bold' }}>✓ Active</span>
