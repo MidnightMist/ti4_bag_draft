@@ -139,14 +139,12 @@ export default function PlayerHandPanel({ player, activeTileId, onSelectTile, on
   const blueTiles = player?.hand?.blue || [];
   const redTiles = player?.hand?.red || [];
 
-  // 5 Tiles (3 Blue + 2 Red)
+  // Dynamically map all hand tiles (e.g. 8 tiles for 3 players: 6 Blue + 2 Red; 5 tiles for 4-8 players: 3 Blue + 2 Red)
   const displayTiles = [
-    { tileId: blueTiles[0] || null, key: 'b0' },
-    { tileId: blueTiles[1] || null, key: 'b1' },
-    { tileId: blueTiles[2] || null, key: 'b2' },
-    { tileId: redTiles[0] || null, key: 'r0' },
-    { tileId: redTiles[1] || null, key: 'r1' },
+    ...blueTiles.map((tileId, idx) => ({ tileId, key: `b-${tileId}-${idx}`, type: 'blue' })),
+    ...redTiles.map((tileId, idx) => ({ tileId, key: `r-${tileId}-${idx}`, type: 'red' })),
   ];
+  const tileCount = displayTiles.length;
 
   return (
     <div
@@ -176,14 +174,14 @@ export default function PlayerHandPanel({ player, activeTileId, onSelectTile, on
         }}
       >
         <span style={{ fontSize: '13px', fontWeight: '700', color: '#e2e8f0' }}>
-          {player ? `${player.name}'s Hand` : 'Your Hand'} (5 Tiles)
+          {player ? `${player.name}'s Hand` : 'Your Hand'} ({tileCount} {tileCount === 1 ? 'Tile' : 'Tiles'})
         </span>
         <span style={{ fontSize: '12px', color: '#6b7280' }}>
           Click a tile to select
         </span>
       </div>
 
-      {/* Row of 5 Large Hexagons with no cards, badges, or texts */}
+      {/* Row of Large Hexagons (up to 8 tiles) */}
       <div
         style={{
           display: 'flex',
@@ -194,16 +192,22 @@ export default function PlayerHandPanel({ player, activeTileId, onSelectTile, on
           padding: '8px 0',
         }}
       >
-        {displayTiles.map((item, idx) => (
-          <LargeHexTile
-            key={`${item.key}-${idx}`}
-            tileId={item.tileId}
-            isSelected={activeTileId === item.tileId && item.tileId !== null}
-            onClick={() => onSelectTile && item.tileId && onSelectTile(item.tileId)}
-            onMouseEnter={() => item.tileId && onHoverTile && onHoverTile(item.tileId)}
-            onMouseLeave={() => onHoverTile && onHoverTile(null)}
-          />
-        ))}
+        {displayTiles.length === 0 ? (
+          <div style={{ color: '#9ca3af', fontSize: '13px', padding: '16px 0' }}>
+            All tiles placed from hand
+          </div>
+        ) : (
+          displayTiles.map((item, idx) => (
+            <LargeHexTile
+              key={`${item.key}-${idx}`}
+              tileId={item.tileId}
+              isSelected={activeTileId === item.tileId && item.tileId !== null}
+              onClick={() => onSelectTile && item.tileId && onSelectTile(item.tileId)}
+              onMouseEnter={() => item.tileId && onHoverTile && onHoverTile(item.tileId)}
+              onMouseLeave={() => onHoverTile && onHoverTile(null)}
+            />
+          ))
+        )}
       </div>
     </div>
   );

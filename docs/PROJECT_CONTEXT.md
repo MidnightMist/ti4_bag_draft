@@ -127,6 +127,26 @@
    - All standard physical grid adjacencies between adjacent hexes remain intact.
    - Adjacency rules (no adjacent anomalies, no adjacent matching wormholes unless forced) strictly respect these hyperlane connections.
 
+### 3-Player Map Layout (Symmetric Triangle with 8 Tiles Hand):
+1. **Geometry & Excluded Hexes:**
+   - Ring 0: Center hex (Mecatol Rex).
+   - Ring 1: 6 hexes.
+   - Ring 2: 12 hexes.
+   - Ring 3: 9 active hexes (3 Player Home Systems + 6 immediately adjacent Ring 3 edge hexes).
+   - Excluded Ring 3 spots (rendered as black outside space): 9 hexes (`home-system-1`, `home-system-3`, `home-system-5`, `ring3-edge-0-2`, `ring3-edge-1-1`, `ring3-edge-2-2`, `ring3-edge-3-1`, `ring3-edge-4-2`, `ring3-edge-5-1`).
+2. **Player Home Systems & Adjacent Edge Hexes:**
+   - Each player's Home System has **exactly 1 Ring 3 spot immediately adjacent on each side**:
+     - **Player 1 (Speaker, index 0):** North-East (`home-system-4`), flanked by `ring3-edge-3-2` and `ring3-edge-4-1`.
+     - **Player 2 (index 1):** South (`home-system-0`), flanked by `ring3-edge-5-2` and `ring3-edge-0-1`.
+     - **Player 3 (index 2):** North-West (`home-system-2`), flanked by `ring3-edge-1-2` and `ring3-edge-2-1`.
+3. **Hand Size & Tile Distribution:**
+   - Each player receives **8 tiles**: **6 Blue tiles** (2 from each Tier in balanced mode, or 6 random) and **2 Red tiles**.
+   - Total draft turns: $3 \times 8 = 24$ tiles, perfectly filling Ring 1 (6) + Ring 2 (12) + Ring 3 active edges (6) = 24 playable hexes.
+4. **Player Rotation / Orientation:**
+   - When viewing from a player's seat, rotation angle is $-S \times 60^\circ$ ($S \in \{4, 0, 2\}$), bringing that player's Home System directly to the bottom (South).
+5. **Cleaned Visual Boundary:**
+   - The outer circular dashed orbit line ($r = 3H$) is hidden in 3-player mode so that the empty space between the wings remains clean and open without an artificial dashed hoop cutting across the black void.
+
 ---
 
 ## 3. Master Tile Catalog & Expansion Sets (`tileData.js`)

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { getMecatolTileId, getCurrentActiveRing, ALL_37_HEXES, getPlayerForSeatIndex, getSeatIndexForPlayer } from '../data/tileData.js';
+import { getMecatolTileId, getCurrentActiveRing, ALL_37_HEXES, getActiveHexes, getPlayerForSeatIndex, getSeatIndexForPlayer } from '../data/tileData.js';
 
 // Geometry constants for flat-topped hexagonal grid
 // Radius enlarged from 54 to 62 for maximum board presence
@@ -362,9 +362,9 @@ export default function MapGrid({
   const mecatolTileId = getMecatolTileId(room?.settings?.expansions);
   const players = room?.players || [];
   const placedTiles = room?.mapState?.placedTiles || {};
-  const activeRing = getCurrentActiveRing(placedTiles, ALL_37_HEXES);
-
   const playerCount = room?.settings?.playerCount || players.length;
+  const activeHexes = getActiveHexes(playerCount);
+  const activeRing = getCurrentActiveRing(placedTiles, activeHexes);
 
   // Rotation logic: if perspectiveSeatIndex is explicitly passed, use it;
   // otherwise default to viewer home system at bottom (South, d=0)
@@ -372,7 +372,7 @@ export default function MapGrid({
   if (perspectiveSeatIndex !== null && perspectiveSeatIndex !== undefined) {
     activeViewerSeat = Number(perspectiveSeatIndex);
   } else if (mySlot) {
-    if (playerCount === 5 || playerCount === 4) {
+    if (playerCount === 5 || playerCount === 4 || playerCount === 3) {
       const myPlayerIdx = players.findIndex(p => p.slotId === mySlot.slotId);
       activeViewerSeat = myPlayerIdx >= 0 ? getSeatIndexForPlayer(myPlayerIdx, playerCount) : 0;
     } else {
@@ -386,13 +386,13 @@ export default function MapGrid({
 
   // Oriented label
   let orientedLabel = 'Player 1';
-  if (playerCount === 5 || playerCount === 4) {
-    if (activeViewerSeat === 0) {
-      orientedLabel = 'Overview (Hyperlanes South)';
-    } else {
-      const p = getPlayerForSeatIndex(players, activeViewerSeat, playerCount);
-      orientedLabel = p ? p.name : `Seat #${activeViewerSeat}`;
-    }
+  if (playerCount === 5 && activeViewerSeat === 0) {
+    orientedLabel = 'Overview (Hyperlanes South)';
+  } else if (playerCount === 4 && activeViewerSeat === 0) {
+    orientedLabel = 'Overview (Hyperlanes South/North)';
+  } else if (playerCount === 5 || playerCount === 4 || playerCount === 3) {
+    const p = getPlayerForSeatIndex(players, activeViewerSeat, playerCount);
+    orientedLabel = p ? p.name : `Seat #${activeViewerSeat}`;
   } else {
     const orientedPlayer = players[activeViewerSeat] || { name: `Player ${activeViewerSeat + 1}` };
     orientedLabel = orientedPlayer.name;
@@ -595,10 +595,12 @@ export default function MapGrid({
           {/* Background Space Ring Orbits */}
           <circle cx="0" cy="0" r={H} fill="none" stroke="#252538" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
           <circle cx="0" cy="0" r={2 * H} fill="none" stroke="#252538" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
-          <circle cx="0" cy="0" r={3 * H} fill="none" stroke="#252538" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
+          {playerCount !== 3 && (
+            <circle cx="0" cy="0" r={3 * H} fill="none" stroke="#252538" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
+          )}
 
           {/* Render All 37 Hexes */}
-          {ALL_37_HEXES.map((hex) => {
+          {activeHexes.map((hex) => {
             const rx = hex.x * cosT - hex.y * sinT;
             const ry = hex.x * sinT + hex.y * cosT;
 
@@ -623,35 +625,39 @@ export default function MapGrid({
             const placed = placedTiles[hex.id];
 
             if (hex.type === 'home_system' && !placed) {
-              const player = getPlayerForSeatIndex(players, hex.seatIndex, playerCount) || {
-                name: `Player ${hex.seatIndex + 1}`,
-                slotId: hex.seatIndex,
-              };
-              const isViewer = mySlot && mySlot.slotId === player.slotId;
-              const isOrientedSeat = hex.seatIndex === activeViewerSeat;
-              const blueCount = player.remainingBlue ?? player.hand?.blue?.length ?? 3;
-              const redCount = player.remainingRed ?? player.hand?.red?.length ?? 2;
+              const isPlayerHome = playerCount !== 3 || [0, 2, 4].includes(hex.seatIndex);
+              if (isPlayerHome) {
+                const player = getPlayerForSeatIndex(players, hex.seatIndex, playerCount) || {
+                  name: `Player ${hex.seatIndex + 1}`,
+                  slotId: hex.seatIndex,
+                };
+                const isViewer = mySlot && mySlot.slotId === player.slotId;
+                const isOrientedSeat = hex.seatIndex === activeViewerSeat;
+                const initialBlue = playerCount === 3 ? 6 : 3;
+                const blueCount = player.remainingBlue ?? player.hand?.blue?.length ?? initialBlue;
+                const redCount = player.remainingRed ?? player.hand?.red?.length ?? 2;
 
-              return (
-                <g key={hex.id}>
-                  <HexTile
-                    cx={rx}
-                    cy={ry}
-                    isHomeSystem={true}
-                    playerName={player.name}
-                    isViewer={isViewer || isOrientedSeat}
-                    isSpeaker={!!player.isSpeaker}
-                  />
-                  {showTileCounts && !isCompleted && (
-                    <HomeSystemTileCountBadge
+                return (
+                  <g key={hex.id}>
+                    <HexTile
                       cx={rx}
                       cy={ry}
-                      blueCount={blueCount}
-                      redCount={redCount}
+                      isHomeSystem={true}
+                      playerName={player.name}
+                      isViewer={isViewer || isOrientedSeat}
+                      isSpeaker={!!player.isSpeaker}
                     />
-                  )}
-                </g>
-              );
+                    {showTileCounts && !isCompleted && (
+                      <HomeSystemTileCountBadge
+                        cx={rx}
+                        cy={ry}
+                        blueCount={blueCount}
+                        redCount={redCount}
+                      />
+                    )}
+                  </g>
+                );
+              }
             }
 
             if (placed) {

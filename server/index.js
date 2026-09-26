@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { DEFAULT_BLUE_TILES, getDefaultTiersForExpansions } from './data/blueTiles.js';
 import { validateBlueTiers } from './data/tierValidator.js';
-import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, ALL_37_HEXES, FIVE_PLAYER_HYPERLANES, FOUR_PLAYER_HYPERLANES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
+import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, ALL_37_HEXES, getActiveHexes, FIVE_PLAYER_HYPERLANES, FOUR_PLAYER_HYPERLANES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -77,6 +77,7 @@ function dealPlayerHands(room) {
   const expansions = room.settings.expansions;
   const mecatolId = getMecatolTileId(expansions);
   const isBalanced = room.settings.tileMode === 'balanced';
+  const playerCount = room.settings.playerCount || room.players.length;
 
   // Red tiles pool (excluding any invalid)
   const redPool = shuffle(getActiveRedTiles(expansions));
@@ -89,13 +90,17 @@ function dealPlayerHands(room) {
 
     room.players.forEach((p) => {
       const pBlue = [];
-      if (t1.length > 0) pBlue.push(t1.pop());
-      if (t2.length > 0) pBlue.push(t2.pop());
-      if (t3.length > 0) pBlue.push(t3.pop());
+      const blueCountPerTier = playerCount === 3 ? 2 : 1;
+      for (let i = 0; i < blueCountPerTier; i++) {
+        if (t1.length > 0) pBlue.push(t1.pop());
+        if (t2.length > 0) pBlue.push(t2.pop());
+        if (t3.length > 0) pBlue.push(t3.pop());
+      }
 
       const pRed = [];
-      if (redPool.length > 0) pRed.push(redPool.pop());
-      if (redPool.length > 0) pRed.push(redPool.pop());
+      for (let i = 0; i < 2; i++) {
+        if (redPool.length > 0) pRed.push(redPool.pop());
+      }
 
       p.hand = {
         blue: pBlue,
@@ -108,7 +113,8 @@ function dealPlayerHands(room) {
     const bluePool = shuffle(getActiveBlueTiles(expansions).filter(id => id !== mecatolId));
     room.players.forEach((p) => {
       const pBlue = [];
-      for (let i = 0; i < 3; i++) {
+      const blueLimit = playerCount === 3 ? 6 : 3;
+      for (let i = 0; i < blueLimit; i++) {
         if (bluePool.length > 0) pBlue.push(bluePool.pop());
       }
       const pRed = [];
@@ -363,15 +369,16 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const targetHex = ALL_37_HEXES.find(h => h.id === hexId);
+    const playerCount = room.settings?.playerCount || room.players.length;
+    const activeHexes = getActiveHexes(playerCount);
+    const targetHex = activeHexes.find(h => h.id === hexId);
     if (!targetHex) {
       socket.emit('room_error', { message: 'Invalid target hex' });
       return;
     }
 
-    const playerCount = room.settings?.playerCount || room.players.length;
-    const activeRing = getCurrentActiveRing(room.mapState.placedTiles, ALL_37_HEXES);
-    const validation = validatePlacement(room.mapState.placedTiles, targetHex, tileNum, activeRing, ALL_37_HEXES, player, playerCount);
+    const activeRing = getCurrentActiveRing(room.mapState.placedTiles, activeHexes);
+    const validation = validatePlacement(room.mapState.placedTiles, targetHex, tileNum, activeRing, activeHexes, player, playerCount);
 
     if (!validation.allowed) {
       socket.emit('room_error', { message: validation.reason || 'Invalid placement' });
@@ -395,7 +402,8 @@ io.on('connection', (socket) => {
 
     room.mapState.currentTurnIndex = currentTurnIndex + 1;
 
-    const totalTilesToPlace = room.players.length * 5;
+    const tilesPerPlayer = (room.settings?.playerCount === 3 || room.players.length === 3) ? 8 : 5;
+    const totalTilesToPlace = room.players.length * tilesPerPlayer;
     if (room.mapState.currentTurnIndex >= totalTilesToPlace) {
       room.status = 'completed';
     }
@@ -422,7 +430,9 @@ io.on('connection', (socket) => {
     });
 
     // Find all empty hexes in ring 1, ring 2, ring 3
-    const emptyHexes = ALL_37_HEXES.filter(h => {
+    const playerCount = room.settings?.playerCount || room.players.length;
+    const activeHexes = getActiveHexes(playerCount);
+    const emptyHexes = activeHexes.filter(h => {
       if (h.type === 'center' || h.type === 'home_system') return false;
       return !room.mapState.placedTiles[h.id];
     });
@@ -438,7 +448,8 @@ io.on('connection', (socket) => {
       }
     });
 
-    room.mapState.currentTurnIndex = room.players.length * 5;
+    const tilesPerPlayer = playerCount === 3 ? 8 : 5;
+    room.mapState.currentTurnIndex = room.players.length * tilesPerPlayer;
     room.status = 'completed';
 
     io.to(roomId).emit('room_state', room);
@@ -449,17 +460,19 @@ io.on('connection', (socket) => {
     const room = rooms.get(roomId);
     if (!room) return;
 
+    const playerCount = room.settings?.playerCount || room.players.length;
     room.status = 'lobby';
     room.players.forEach(p => {
       p.claimedBy = null;
       p.claimedAt = null;
       p.isSpeaker = false;
       p.hand = null;
-      p.remainingBlue = 3;
+      p.remainingBlue = playerCount === 3 ? 6 : 3;
       p.remainingRed = 2;
     });
     room.players.sort((a, b) => a.slotId - b.slotId);
-    const resetPlacedTiles = room.settings?.playerCount === 5 ? { ...FIVE_PLAYER_HYPERLANES } : room.settings?.playerCount === 4 ? { ...FOUR_PLAYER_HYPERLANES } : {};
+    dealPlayerHands(room);
+    const resetPlacedTiles = playerCount === 5 ? { ...FIVE_PLAYER_HYPERLANES } : playerCount === 4 ? { ...FOUR_PLAYER_HYPERLANES } : {};
     room.mapState = {
       placedTiles: resetPlacedTiles,
       speakerSlotId: null,

@@ -165,6 +165,35 @@ export function generate37Hexes() {
 
 export const ALL_37_HEXES = generate37Hexes();
 
+// In 3-player map, each home system (0, 2, 4) has exactly 1 adjacent Ring 3 spot on each side:
+// - home-system-0 (South): ring3-edge-5-2 (SE side) and ring3-edge-0-1 (SW side)
+// - home-system-2 (North-West): ring3-edge-1-2 (SW side) and ring3-edge-2-1 (North side)
+// - home-system-4 (North-East): ring3-edge-3-2 (North side) and ring3-edge-4-1 (SE side)
+export const THREE_PLAYER_RING3_HEX_IDS = new Set([
+  'home-system-0',
+  'ring3-edge-0-1',
+  'ring3-edge-5-2',
+  'home-system-2',
+  'ring3-edge-2-1',
+  'ring3-edge-1-2',
+  'home-system-4',
+  'ring3-edge-4-1',
+  'ring3-edge-3-2'
+]);
+
+export function getActiveHexes(playerCount = 6) {
+  const hexes = generate37Hexes();
+  if (playerCount === 3) {
+    return hexes.filter(h => {
+      if (h.ring === 3) {
+        return THREE_PLAYER_RING3_HEX_IDS.has(h.id);
+      }
+      return true;
+    });
+  }
+  return hexes;
+}
+
 // Pre-placed fixed hyperlane tiles for 4-player galaxy map (with hyperlanes on both South and North corridors)
 export const FOUR_PLAYER_HYPERLANES = {
   // South corridor (d = 0) - original orientation
@@ -184,19 +213,24 @@ export const FOUR_PLAYER_HYPERLANES = {
   'home-system-3': { tileId: '86A', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 180 },
 };
 
-// 4-player seat mapping: P1 (North-East = seat 4), P2 (South-East = seat 5), P3 (South-West = seat 1), P4 (North-West = seat 2)
-export const FOUR_PLAYER_SEAT_TO_PLAYER_INDEX = {
-  4: 0,
-  5: 1,
-  1: 2,
-  2: 3,
+// Pre-placed home systems for 3-player galaxy map (P1 at home-system-4, P2 at home-system-0, P3 at home-system-2)
+export const THREE_PLAYER_HOME_SYSTEMS = {
+  'home-system-4': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 4, playerIndex: 0 },
+  'home-system-0': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 0, playerIndex: 1 },
+  'home-system-2': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 2, playerIndex: 2 },
 };
 
-export const FOUR_PLAYER_PLAYER_TO_SEAT_INDEX = {
+// 3-player seat mapping: P1 (North-East = seat 4), P2 (South = seat 0), P3 (North-West = seat 2)
+export const THREE_PLAYER_SEAT_TO_PLAYER_INDEX = {
+  4: 0,
+  0: 1,
+  2: 2,
+};
+
+export const THREE_PLAYER_PLAYER_TO_SEAT_INDEX = {
   0: 4,
-  1: 5,
-  2: 1,
-  3: 2,
+  1: 0,
+  2: 2,
 };
 
 // 5-player seat mapping:
@@ -232,6 +266,10 @@ export function getPlayerForSeatIndex(players, seatIndex, playerCount = 6) {
     const pIdx = FOUR_PLAYER_SEAT_TO_PLAYER_INDEX[seatIndex];
     return pIdx !== undefined ? players[pIdx] : null;
   }
+  if (playerCount === 3) {
+    const pIdx = THREE_PLAYER_SEAT_TO_PLAYER_INDEX[seatIndex];
+    return pIdx !== undefined ? players[pIdx] : null;
+  }
   return players[seatIndex] || null;
 }
 
@@ -241,6 +279,9 @@ export function getSeatIndexForPlayer(playerIndex, playerCount = 6) {
   }
   if (playerCount === 4) {
     return FOUR_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
+  }
+  if (playerCount === 3) {
+    return THREE_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
   }
   return playerIndex;
 }

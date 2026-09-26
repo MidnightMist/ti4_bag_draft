@@ -6,7 +6,7 @@ import MapGrid from './MapGrid.jsx';
 import DevToolbar from './DevToolbar.jsx';
 import PlayerHandPanel from './PlayerHandPanel.jsx';
 import TileZoomPreview from './TileZoomPreview.jsx';
-import { getPlayerForTurn, validatePlacement, getCurrentActiveRing, ALL_37_HEXES, getSeatIndexForPlayer } from '../data/tileData.js';
+import { getPlayerForTurn, validatePlacement, getCurrentActiveRing, ALL_37_HEXES, getActiveHexes, getSeatIndexForPlayer } from '../data/tileData.js';
 
 export default function RoomView() {
   const { roomId } = useParams();
@@ -37,7 +37,12 @@ export default function RoomView() {
   const handleSwitchUser = (newUserId) => {
     setActiveUserOverride(newUserId);
     setUserId(newUserId);
+    setSelectedPerspectiveSeat(null);
   };
+
+  useEffect(() => {
+    setSelectedPerspectiveSeat(null);
+  }, [userId]);
 
   // Initialize socket and load room
   useEffect(() => {
@@ -154,24 +159,25 @@ export default function RoomView() {
 
   // Perspective calculation: default to viewer's claimed seat, or seat 0 (Player 1 in 6p, Overview in 5p/4p)
   const defaultPerspectiveSeat = myClaimedSlot
-    ? ((totalSlots === 5 || totalSlots === 4)
+    ? ((totalSlots === 5 || totalSlots === 4 || totalSlots === 3)
         ? getSeatIndexForPlayer(room.players.findIndex(p => p.slotId === myClaimedSlot.slotId), totalSlots)
         : room.players.findIndex(p => p.slotId === myClaimedSlot.slotId))
-    : 0;
+    : (totalSlots === 3 ? getSeatIndexForPlayer(0, 3) : 0);
   const activePerspectiveSeat = selectedPerspectiveSeat !== null ? selectedPerspectiveSeat : (defaultPerspectiveSeat >= 0 ? defaultPerspectiveSeat : 0);
 
   // Turn calculation
   const currentTurnIndex = room.mapState?.currentTurnIndex || 0;
   const currentTurnPlayer = getPlayerForTurn(room.players, currentTurnIndex);
   const isMyTurn = myClaimedSlot && currentTurnPlayer && currentTurnPlayer.slotId === myClaimedSlot.slotId;
-  const activeRing = getCurrentActiveRing(room.mapState?.placedTiles || {}, ALL_37_HEXES);
+  const activeHexes = getActiveHexes(totalSlots);
+  const activeRing = getCurrentActiveRing(room.mapState?.placedTiles || {}, activeHexes);
 
   // Validate pending placement if tile and hex selected
   let pendingValidation = null;
   if (selectedTileId && pendingHexId) {
-    const targetHex = ALL_37_HEXES.find(h => h.id === pendingHexId);
+    const targetHex = activeHexes.find(h => h.id === pendingHexId);
     if (targetHex) {
-      pendingValidation = validatePlacement(room.mapState?.placedTiles || {}, targetHex, selectedTileId, activeRing, ALL_37_HEXES, currentTurnPlayer, totalSlots);
+      pendingValidation = validatePlacement(room.mapState?.placedTiles || {}, targetHex, selectedTileId, activeRing, activeHexes, currentTurnPlayer, totalSlots);
     }
   }
 
@@ -542,7 +548,7 @@ export default function RoomView() {
                 )}
 
                 {room.players.map((player, playerIdx) => {
-                  const targetSeat = (totalSlots === 5 || totalSlots === 4) ? getSeatIndexForPlayer(playerIdx, totalSlots) : playerIdx;
+                  const targetSeat = (totalSlots === 5 || totalSlots === 4 || totalSlots === 3) ? getSeatIndexForPlayer(playerIdx, totalSlots) : playerIdx;
                   const isOriented = activePerspectiveSeat === targetSeat;
                   const isViewer = myClaimedSlot && myClaimedSlot.slotId === player.slotId;
 
@@ -600,7 +606,7 @@ export default function RoomView() {
                   id="rotate-ccw-btn"
                   onClick={() => setSelectedPerspectiveSeat((prev) => {
                     const cur = prev !== null ? prev : activePerspectiveSeat;
-                    return (cur + 5) % (room.players.length || 6);
+                    return (cur + 5) % 6;
                   })}
                   style={{
                     flex: 1,
@@ -622,7 +628,7 @@ export default function RoomView() {
                   id="rotate-cw-btn"
                   onClick={() => setSelectedPerspectiveSeat((prev) => {
                     const cur = prev !== null ? prev : activePerspectiveSeat;
-                    return (cur + 1) % (room.players.length || 6);
+                    return (cur + 1) % 6;
                   })}
                   style={{
                     flex: 1,
@@ -646,7 +652,7 @@ export default function RoomView() {
                     onClick={() => {
                       const myIdx = room.players.findIndex(p => p.slotId === myClaimedSlot.slotId);
                       if (myIdx >= 0) {
-                        const targetSeat = (totalSlots === 5 || totalSlots === 4) ? getSeatIndexForPlayer(myIdx, totalSlots) : myIdx;
+                        const targetSeat = (totalSlots === 5 || totalSlots === 4 || totalSlots === 3) ? getSeatIndexForPlayer(myIdx, totalSlots) : myIdx;
                         setSelectedPerspectiveSeat(targetSeat);
                       }
                     }}
@@ -885,7 +891,8 @@ export default function RoomView() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 {room.players.map((p) => {
                   const isMe = Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId;
-                  const blueCount = p.remainingBlue ?? p.hand?.blue?.length ?? 3;
+                  const initialBlue = totalSlots === 3 ? 6 : 3;
+                  const blueCount = p.remainingBlue ?? p.hand?.blue?.length ?? initialBlue;
                   const redCount = p.remainingRed ?? p.hand?.red?.length ?? 2;
 
                   return (
