@@ -86,10 +86,6 @@ function startFactionBan(room) {
     p.banPool = pool.slice(0, 3);
     p.bannedFactionId = null;
     p.hasBanned = false;
-    if (p.claimedBy && p.claimedBy.startsWith('sim_bot_')) {
-      p.bannedFactionId = p.banPool[0];
-      p.hasBanned = true;
-    }
   });
 
   if (room.players.every(p => p.hasBanned)) {
