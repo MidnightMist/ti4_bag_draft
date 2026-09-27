@@ -559,7 +559,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 
 // Serve static tile images from client/public/tiles or root /tiles
 const clientTiles = path.resolve(__dirname, '../client/public/tiles');
@@ -572,12 +572,15 @@ const clientFactions = path.resolve(__dirname, '../client/public/factions');
 app.use('/factions', express.static(clientFactions));
 
 const clientDist = path.resolve(__dirname, '../client/dist');
-if (fs.existsSync(clientDist)) {
-  app.use(express.static(clientDist));
-  app.get('*', (req, res) => {
-    res.sendFile(path.resolve(clientDist, 'index.html'));
-  });
-}
+app.use(express.static(clientDist));
+app.get('*', (req, res) => {
+  const indexPath = path.resolve(clientDist, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(503).send('Application is compiling, please reload shortly.');
+  }
+});
 
 httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
