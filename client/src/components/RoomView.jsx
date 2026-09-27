@@ -164,7 +164,7 @@ export default function RoomView() {
 
   // Perspective calculation: default to viewer's claimed seat, or seat 0 (Player 1 in 6p, Overview in 5p/4p)
   const defaultPerspectiveSeat = myClaimedSlot
-    ? ((totalSlots === 5 || totalSlots === 4 || totalSlots === 3)
+    ? ((totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3)
         ? getSeatIndexForPlayer(room.players.findIndex(p => p.slotId === myClaimedSlot.slotId), totalSlots)
         : room.players.findIndex(p => p.slotId === myClaimedSlot.slotId))
     : (totalSlots === 3 ? getSeatIndexForPlayer(0, 3) : 0);
@@ -175,7 +175,7 @@ export default function RoomView() {
   const currentTurnPlayer = getPlayerForTurn(room.players, currentTurnIndex);
   const isMyTurn = Boolean(myClaimedSlot && currentTurnPlayer && currentTurnPlayer.slotId === myClaimedSlot.slotId);
   const activeHexes = getActiveHexes(totalSlots);
-  const activeRing = getCurrentActiveRing(room.mapState?.placedTiles || {}, activeHexes);
+  const activeRing = getCurrentActiveRing(room.mapState?.placedTiles || {}, activeHexes, totalSlots);
 
   // Private draft preview: only the player whose turn it is sees their tentative placement
   const currentSlotId = myClaimedSlot?.slotId;
@@ -593,7 +593,7 @@ export default function RoomView() {
                 )}
 
                 {room.players.map((player, playerIdx) => {
-                  const targetSeat = (totalSlots === 5 || totalSlots === 4 || totalSlots === 3) ? getSeatIndexForPlayer(playerIdx, totalSlots) : playerIdx;
+                  const targetSeat = (totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3) ? getSeatIndexForPlayer(playerIdx, totalSlots) : playerIdx;
                   const isOriented = activePerspectiveSeat === targetSeat;
                   const isViewer = myClaimedSlot && myClaimedSlot.slotId === player.slotId;
 
@@ -1064,7 +1064,7 @@ export default function RoomView() {
                 style={{
                   marginBottom: '14px',
                   width: '100%',
-                  maxWidth: '920px',
+                  maxWidth: totalSlots === 7 ? '840px' : '920px',
                   backgroundColor: '#7f1d1d',
                   border: '1px solid #ef4444',
                   borderRadius: '8px',
@@ -1121,7 +1121,7 @@ export default function RoomView() {
                 style={{
                   marginTop: '14px',
                   width: '100%',
-                  maxWidth: '920px',
+                  maxWidth: totalSlots === 7 ? '840px' : '920px',
                   backgroundColor: '#1b1b2f',
                   border: '1px solid #3b82f6',
                   borderRadius: '12px',

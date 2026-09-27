@@ -174,6 +174,41 @@
 5. **Cleaned Visual Boundary:**
    - The outer circular dashed orbit line ($r = 3H$) is hidden in 3-player mode so that the empty space between the wings remains clean and open without an artificial dashed hoop cutting across the black void.
 
+### 7-Player Map Layout & Distance-Based Rings (PoK Hyperlanes Standard):
+1. **Board Geometry & Active 49-Hex Set:**
+   - Asymmetric 8-column galaxy layout (columns -4 to +3, spanning 2 additional tiles horizontally compared to standard 6p map) utilizing standard PoK hyperlane corridors (85B, 84B, 90B, 88B, 86B, 83B).
+   - Ring 0: Center hex (`center`, Mecatol Rex - Tile 18 / 112).
+   - 6 Fixed Hyperlane Tiles:
+     - `hl-85B`: Tile **85B** (col 0, row -1, directly North of Mecatol Rex).
+     - `hl-84B`: Tile **84B** (col 0, row 1, directly South of Mecatol Rex).
+     - `hl-88B`: Tile **88B** (col 1, row -2.5, North-East).
+     - `hl-86B`: Tile **86B** (col 1, row 2.5, South-East).
+     - `hl-90B`: Tile **90B** (col -1, row 0.5, South-West).
+     - `hl-83B`: Tile **83B** (col -3, row -0.5, West).
+2. **7 Player Home System Seating (Clockwise around perimeter):**
+   - **Player 1 (Speaker, P1):** North (`home-p1`, col 0, row -4, Seat 0)
+   - **Player 2 (P2):** North-East (`home-p2`, col 3, row -1.5, Seat 1)
+   - **Player 3 (P3):** South-East (`home-p3`, col 3, row 1.5, Seat 2)
+   - **Player 4 (P4):** South (`home-p4`, col 0, row 4, Seat 3)
+   - **Player 5 (P5):** South-West (`home-p5`, col -3, row 2.5, Seat 4)
+   - **Player 6 (P6):** West (`home-p6`, col -4, row 0, Seat 5)
+   - **Player 7 (P7):** North-West (`home-p7`, col -3, row -2.5, Seat 6)
+3. **Distance-Based Ring Classification & Placement Order:**
+   - Rings are defined strictly by graph distance (steps) from Mecatol Rex:
+     - **Ring 1:** Distance 1 from Mecatol Rex.
+     - **Ring 2:** Distance 2 from Mecatol Rex.
+     - **Ring 3:** Distance 3 from Mecatol Rex.
+   - Placement rule strictly enforces: Ring 1 draftable hexes must be completely filled before Ring 2, and Ring 2 before Ring 3.
+4. **Draft Turns & Completion:**
+   - Total draftable slots: 35 hexes (7 players $\times$ 5 tiles = 35 turns).
+   - Draft progresses in snake order until all slots are filled, then automatically transitions to `completed`.
+5. **Framing & Viewport Display (Wide 8-Column Map):**
+   - Because the 7-player map is 2 tiles wider (8 columns, $X \in [-434, 341]$ for hexes, up to $[-471, 377]$ with home system badges) and 9 rows tall ($Y \in [-483, 483]$, up to $\pm 527$ with badges):
+     - **Draft Mode ViewBox:** `-500 -555 910 1110` (`aspectRatio: '910 / 1110'`), providing uniform ~30px margins on all 4 sides including the Home System Blue & Red hand badges.
+     - **Completed Mode ViewBox:** `-455 -505 820 1010` (`aspectRatio: '820 / 1010'`), snugly framing all 49 hexes with ~22px padding.
+     - **Viewport Scaling:** In draft mode, SVG `maxHeight` is constrained to `calc(100vh - 280px)` with `maxWidth: 720px` so the entire galaxy board, header bar, and bottom player hand panel comfortably fit within the user's viewport without excessive vertical scrolling. In completed mode, `maxHeight` expands to `calc(100vh - 120px)`.
+   - Map stays upright matching reference orientation with viewing player highlighted.
+
 ---
 
 ## 3. Master Tile Catalog & Expansion Sets (`tileData.js`)
@@ -238,10 +273,11 @@
 ---
 
 ## 5. Tile Image Assets Architecture
-- **Location:** `client/public/tiles/` (and mirrored to `client/dist/tiles/` on build).
+- **Location:** `client/public/tiles/` (and mirrored to `client/dist/tiles/` on build, with backup in root `/tiles`).
+- **Archive Source:** Downloaded and extracted from Google Drive archive (ID `18z9SdJuj2m7aIm17IGoYe-SV4mtWUuBk`), containing 124 high-resolution tile images (`ST_*.png`).
 - **Git Tracking:** Explicitly ignored in `.gitignore` (`client/public/tiles/`, `tiles/`) so binary image assets are never committed to GitHub.
 - **Naming Convention:** `ST_{tileId}.png` (e.g. `ST_18.png` for Mecatol Rex, `ST_1.png` for Jord / Sol, etc.).
-- **Server Route:** Express explicitly exposes `/tiles` via `express.static(path.resolve(__dirname, '../client/public/tiles'))`.
+- **Server Route:** Express explicitly exposes `/tiles` via `express.static(path.resolve(__dirname, '../client/public/tiles'))` and `express.static(path.resolve(__dirname, '../tiles'))`.
 - **UI Rendering & Fallback:** `HexTile` SVG component clips image via `<clipPath id="hex-clip-shape">`, applies crisp outline stroke overlay, and automatically falls back to vector polygon + text label if an image fails to load or is not present.
 
 ---
@@ -308,4 +344,18 @@
    - An **Accept** button appears in the placement action bar alongside real-time validation feedback.
    - Clicking **Accept** confirms the choice (`place_tile` socket event), places the tile on the board, removes it from the player's hand, and advances the turn in snake order.
    - Any runtime socket error (e.g. `room_error`) is presented as a dismissible notification banner above the map rather than unmounting or crashing the room view.
+5. **7-Player Neighborhood Adjacency Rules (`extraAdjacencyMap7`):**
+   - Configured in `tileData.js` (both client and server) mapped to the exact 7-player board slot numbers (1-36 excluding home systems and hyperlanes):
+     - Slot 6 (`ring-1-neg35`) <--> Slot 12 (`ring-2-neg2`)
+     - Slot 6 (`ring-1-neg35`) <--> Slot 7 (`ring-1-neg15`)
+     - Slot 7 (`ring-1-neg15`) <--> Slot 1 (`ring-0-neg3`)
+     - Slot 8 (`ring-1-neg05`) <--> Slot 2 (`ring-0-neg2`)
+     - Slot 28 (`ring-neg2-neg1`) <--> Slot 36 (`ring-neg4-neg1`)
+     - Slot 29 (`ring-neg2-0`) <--> Slot 36 (`ring-neg4-neg1`)
+     - Slot 22 (`ring-neg1-neg05`) <--> Slot 30 (`ring-neg2-pos1`)
+     - Slot 22 (`ring-neg1-neg05`) <--> Slot 23 (`ring-neg1-pos15`)
+     - Slot 9 (`ring-1-pos05`) <--> Slot 4 (`ring-0-pos2`)
+     - Slot 10 (`ring-1-pos15`) <--> Slot 5 (`center`)
+     - Slot 10 (`ring-1-pos15`) <--> Slot 11 (`ring-1-pos35`)
+     - Slot 16 (`ring-2-pos2`) <--> Slot 11 (`ring-1-pos35`)
 

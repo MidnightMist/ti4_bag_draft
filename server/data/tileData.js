@@ -181,7 +181,77 @@ export const THREE_PLAYER_RING3_HEX_IDS = new Set([
   'ring3-edge-3-2'
 ]);
 
+export const SEVEN_PLAYER_49_HEXES = [
+  // Col 0 (9 tiles)
+  { id: 'home-p1', col: 0, row: -4, x: 0.0, y: -429.56, type: 'home_system', ring: 3, seatIndex: 0 },
+  { id: 'ring-0-neg3', col: 0, row: -3, x: 0.0, y: -322.17, type: 'ring_system', ring: 2 },
+  { id: 'ring-0-neg2', col: 0, row: -2, x: 0.0, y: -214.78, type: 'ring_system', ring: 1 },
+  { id: 'hl-85B', col: 0, row: -1, x: 0.0, y: -107.39, type: 'hyperlane', ring: 1 },
+  { id: 'center', col: 0, row: 0, x: 0.0, y: 0.0, type: 'center', ring: 0 },
+  { id: 'hl-84B', col: 0, row: 1, x: 0.0, y: 107.39, type: 'hyperlane', ring: 1 },
+  { id: 'ring-0-pos2', col: 0, row: 2, x: 0.0, y: 214.78, type: 'ring_system', ring: 1 },
+  { id: 'ring-0-pos3', col: 0, row: 3, x: 0.0, y: 322.17, type: 'ring_system', ring: 2 },
+  { id: 'home-p4', col: 0, row: 4, x: 0.0, y: 429.56, type: 'home_system', ring: 3, seatIndex: 3 },
+
+  // Col +1 (8 tiles)
+  { id: 'ring-1-neg35', col: 1, row: -3.5, x: 93.0, y: -375.87, type: 'ring_system', ring: 3 },
+  { id: 'hl-88B', col: 1, row: -2.5, x: 93.0, y: -268.48, type: 'hyperlane', ring: 2 },
+  { id: 'ring-1-neg15', col: 1, row: -1.5, x: 93.0, y: -161.09, type: 'ring_system', ring: 2 },
+  { id: 'ring-1-neg05', col: 1, row: -0.5, x: 93.0, y: -53.7, type: 'ring_system', ring: 1 },
+  { id: 'ring-1-pos05', col: 1, row: 0.5, x: 93.0, y: 53.7, type: 'ring_system', ring: 1 },
+  { id: 'ring-1-pos15', col: 1, row: 1.5, x: 93.0, y: 161.09, type: 'ring_system', ring: 2 },
+  { id: 'hl-86B', col: 1, row: 2.5, x: 93.0, y: 268.48, type: 'hyperlane', ring: 2 },
+  { id: 'ring-1-pos35', col: 1, row: 3.5, x: 93.0, y: 375.87, type: 'ring_system', ring: 3 },
+
+  // Col +2 (5 tiles)
+  { id: 'ring-2-neg2', col: 2, row: -2, x: 186.0, y: -214.78, type: 'ring_system', ring: 3 },
+  { id: 'ring-2-neg1', col: 2, row: -1, x: 186.0, y: -107.39, type: 'ring_system', ring: 2 },
+  { id: 'ring-2-0', col: 2, row: 0, x: 186.0, y: 0.0, type: 'ring_system', ring: 2 },
+  { id: 'ring-2-pos1', col: 2, row: 1, x: 186.0, y: 107.39, type: 'ring_system', ring: 2 },
+  { id: 'ring-2-pos2', col: 2, row: 2, x: 186.0, y: 214.78, type: 'ring_system', ring: 3 },
+
+  // Col +3 (4 tiles)
+  { id: 'home-p2', col: 3, row: -1.5, x: 279.0, y: -161.09, type: 'home_system', ring: 3, seatIndex: 1 },
+  { id: 'ring-3-neg05', col: 3, row: -0.5, x: 279.0, y: -53.7, type: 'ring_system', ring: 3 },
+  { id: 'ring-3-pos05', col: 3, row: 0.5, x: 279.0, y: 53.7, type: 'ring_system', ring: 3 },
+  { id: 'home-p3', col: 3, row: 1.5, x: 279.0, y: 161.09, type: 'home_system', ring: 3, seatIndex: 2 },
+
+  // Col -1 (8 tiles)
+  { id: 'ring-neg1-neg35', col: -1, row: -3.5, x: -93.0, y: -375.87, type: 'ring_system', ring: 3 },
+  { id: 'ring-neg1-neg25', col: -1, row: -2.5, x: -93.0, y: -268.48, type: 'ring_system', ring: 2 },
+  { id: 'ring-neg1-neg15', col: -1, row: -1.5, x: -93.0, y: -161.09, type: 'ring_system', ring: 1 },
+  { id: 'ring-neg1-neg05', col: -1, row: -0.5, x: -93.0, y: -53.7, type: 'ring_system', ring: 1 },
+  { id: 'hl-90B', col: -1, row: 0.5, x: -93.0, y: 53.7, type: 'hyperlane', ring: 1 },
+  { id: 'ring-neg1-pos15', col: -1, row: 1.5, x: -93.0, y: 161.09, type: 'ring_system', ring: 1 },
+  { id: 'ring-neg1-pos25', col: -1, row: 2.5, x: -93.0, y: 268.48, type: 'ring_system', ring: 2 },
+  { id: 'ring-neg1-pos35', col: -1, row: 3.5, x: -93.0, y: 375.87, type: 'ring_system', ring: 3 },
+
+  // Col -2 (7 tiles)
+  { id: 'ring-neg2-neg3', col: -2, row: -3, x: -186.0, y: -322.17, type: 'ring_system', ring: 3 },
+  { id: 'ring-neg2-neg2', col: -2, row: -2, x: -186.0, y: -214.78, type: 'ring_system', ring: 2 },
+  { id: 'ring-neg2-neg1', col: -2, row: -1, x: -186.0, y: -107.39, type: 'ring_system', ring: 2 },
+  { id: 'ring-neg2-0', col: -2, row: 0, x: -186.0, y: 0.0, type: 'ring_system', ring: 2 },
+  { id: 'ring-neg2-pos1', col: -2, row: 1, x: -186.0, y: 107.39, type: 'ring_system', ring: 2 },
+  { id: 'ring-neg2-pos2', col: -2, row: 2, x: -186.0, y: 214.78, type: 'ring_system', ring: 2 },
+  { id: 'ring-neg2-pos3', col: -2, row: 3, x: -186.0, y: 322.17, type: 'ring_system', ring: 3 },
+
+  // Col -3 (6 tiles)
+  { id: 'home-p7', col: -3, row: -2.5, x: -279.0, y: -268.48, type: 'home_system', ring: 3, seatIndex: 6 },
+  { id: 'ring-neg3-neg15', col: -3, row: -1.5, x: -279.0, y: -161.09, type: 'ring_system', ring: 3 },
+  { id: 'hl-83B', col: -3, row: -0.5, x: -279.0, y: -53.7, type: 'hyperlane', ring: 2 },
+  { id: 'ring-neg3-pos05', col: -3, row: 0.5, x: -279.0, y: 53.7, type: 'ring_system', ring: 3 },
+  { id: 'ring-neg3-pos15', col: -3, row: 1.5, x: -279.0, y: 161.09, type: 'ring_system', ring: 3 },
+  { id: 'home-p5', col: -3, row: 2.5, x: -279.0, y: 268.48, type: 'home_system', ring: 3, seatIndex: 4 },
+
+  // Col -4 (2 tiles)
+  { id: 'ring-neg4-neg1', col: -4, row: -1, x: -372.0, y: -107.39, type: 'ring_system', ring: 3 },
+  { id: 'home-p6', col: -4, row: 0, x: -372.0, y: 0.0, type: 'home_system', ring: 3, seatIndex: 5 },
+];
+
 export function getActiveHexes(playerCount = 6) {
+  if (playerCount === 7) {
+    return SEVEN_PLAYER_49_HEXES.map(h => ({ ...h }));
+  }
   const hexes = generate37Hexes();
   if (playerCount === 3) {
     return hexes.filter(h => {
@@ -193,6 +263,48 @@ export function getActiveHexes(playerCount = 6) {
   }
   return hexes;
 }
+
+// Pre-placed fixed hyperlane tiles for 7-player galaxy map
+export const SEVEN_PLAYER_HYPERLANES = {
+  'hl-85B': { tileId: '85B', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 0 },
+  'hl-84B': { tileId: '84B', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 0 },
+  'hl-88B': { tileId: '88B', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 0 },
+  'hl-86B': { tileId: '86B', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 0 },
+  'hl-90B': { tileId: '90B', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 0 },
+  'hl-83B': { tileId: '83B', type: 'hyperlane', isHyperlane: true, fixed: true, rotation: 120 },
+};
+
+// Pre-placed home systems for 7-player galaxy map
+export const SEVEN_PLAYER_HOME_SYSTEMS = {
+  'home-p1': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 0, playerIndex: 0 },
+  'home-p2': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 1, playerIndex: 1 },
+  'home-p3': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 2, playerIndex: 2 },
+  'home-p4': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 3, playerIndex: 3 },
+  'home-p5': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 4, playerIndex: 4 },
+  'home-p6': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 5, playerIndex: 5 },
+  'home-p7': { tileId: 0, type: 'home_system', fixed: true, seatIndex: 6, playerIndex: 6 },
+};
+
+// 7-player seat mapping:
+export const SEVEN_PLAYER_SEAT_TO_PLAYER_INDEX = {
+  0: 0,
+  1: 1,
+  2: 2,
+  3: 3,
+  4: 4,
+  5: 5,
+  6: 6,
+};
+
+export const SEVEN_PLAYER_PLAYER_TO_SEAT_INDEX = {
+  0: 0,
+  1: 1,
+  2: 2,
+  3: 3,
+  4: 4,
+  5: 5,
+  6: 6,
+};
 
 // Pre-placed fixed hyperlane tiles for 5-player galaxy map
 export const FIVE_PLAYER_HYPERLANES = {
@@ -297,6 +409,10 @@ export const FIVE_PLAYER_PLAYER_TO_SEAT_INDEX = {
 
 export function getPlayerForSeatIndex(players, seatIndex, playerCount = 6) {
   if (!players || players.length === 0) return null;
+  if (playerCount === 7) {
+    const pIdx = SEVEN_PLAYER_SEAT_TO_PLAYER_INDEX[seatIndex];
+    return pIdx !== undefined ? players[pIdx] : null;
+  }
   if (playerCount === 5) {
     const pIdx = FIVE_PLAYER_SEAT_TO_PLAYER_INDEX[seatIndex];
     return pIdx !== undefined ? players[pIdx] : null;
@@ -313,6 +429,9 @@ export function getPlayerForSeatIndex(players, seatIndex, playerCount = 6) {
 }
 
 export function getSeatIndexForPlayer(playerIndex, playerCount = 6) {
+  if (playerCount === 7) {
+    return SEVEN_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
+  }
   if (playerCount === 5) {
     return FIVE_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
   }
@@ -335,6 +454,40 @@ export function getHexNeighbors(hex, allHexes = ALL_37_HEXES, playerCount = 6) {
     const dist = Math.sqrt(dx * dx + dy * dy);
     if (dist >= H_dist * 0.93 && dist <= H_dist * 1.07) {
       neighbors.push(other);
+    }
+  }
+
+  // 7-player slot-based neighborhood adjacency connections:
+  if (playerCount === 7) {
+    const extraAdjacencyMap7 = {
+      'ring-1-neg35': ['ring-2-neg2', 'ring-1-neg15'],
+      'ring-2-neg2': ['ring-1-neg35'],
+      'ring-1-neg15': ['ring-0-neg3', 'ring-1-neg35'],
+      'ring-0-neg3': ['ring-1-neg15'],
+      'ring-1-neg05': ['ring-0-neg2'],
+      'ring-0-neg2': ['ring-1-neg05'],
+      'ring-neg2-neg1': ['ring-neg4-neg1'],
+      'ring-neg4-neg1': ['ring-neg2-0', 'ring-neg2-neg1'],
+      'ring-neg2-0': ['ring-neg4-neg1'],
+      'ring-neg1-neg05': ['ring-neg2-pos1', 'ring-neg1-pos15'],
+      'ring-neg2-pos1': ['ring-neg1-neg05'],
+      'ring-neg1-pos15': ['ring-neg1-neg05'],
+      'ring-1-pos05': ['ring-0-pos2'],
+      'ring-0-pos2': ['ring-1-pos05'],
+      'ring-1-pos15': ['ring-0-pos3', 'ring-1-pos35'],
+      'ring-0-pos3': ['ring-1-pos15'],
+      'ring-1-pos35': ['ring-1-pos15', 'ring-2-pos2'],
+      'ring-2-pos2': ['ring-1-pos35'],
+    };
+
+    const extras = extraAdjacencyMap7[hex.id];
+    if (extras) {
+      extras.forEach(extraId => {
+        if (!neighbors.some(n => n.id === extraId)) {
+          const target = allHexes.find(h => h.id === extraId);
+          if (target) neighbors.push(target);
+        }
+      });
     }
   }
 
@@ -438,7 +591,23 @@ export function getHexNeighbors(hex, allHexes = ALL_37_HEXES, playerCount = 6) {
   return neighbors;
 }
 
-export function getCurrentActiveRing(placedTiles = {}, allHexes = ALL_37_HEXES) {
+export function getCurrentActiveRing(placedTiles = {}, allHexes = ALL_37_HEXES, playerCount = 6) {
+  if (playerCount === 7) {
+    const ring1Hexes = allHexes.filter(h => h.ring === 1 && h.type === 'ring_system');
+    const ring1Filled = ring1Hexes.every(h => placedTiles[h.id]);
+    if (!ring1Filled) return 1;
+
+    const ring2Hexes = allHexes.filter(h => h.ring === 2 && h.type === 'ring_system');
+    const ring2Filled = ring2Hexes.every(h => placedTiles[h.id]);
+    if (!ring2Filled) return 2;
+
+    const ring3Hexes = allHexes.filter(h => h.ring === 3 && h.type === 'ring_system');
+    const ring3Filled = ring3Hexes.every(h => placedTiles[h.id]);
+    if (!ring3Filled) return 3;
+
+    return 3;
+  }
+
   const ring1Hexes = allHexes.filter(h => h.ring === 1);
   const ring1Filled = ring1Hexes.every(h => placedTiles[h.id]);
   if (!ring1Filled) return 1;
@@ -496,8 +665,14 @@ export function validatePlacement(placedTiles = {}, targetHex, tileId, activeRin
     return { allowed: false, reason: 'Hex is already occupied' };
   }
 
-  if (targetHex.ring !== activeRing || (targetHex.ring === 3 && targetHex.type !== 'ring3')) {
-    return { allowed: false, reason: `Must place in Ring ${activeRing} first` };
+  if (playerCount === 7) {
+    if (targetHex.ring !== activeRing || targetHex.type !== 'ring_system') {
+      return { allowed: false, reason: `Must place in Ring ${activeRing} first` };
+    }
+  } else {
+    if (targetHex.ring !== activeRing || (targetHex.ring === 3 && targetHex.type !== 'ring3')) {
+      return { allowed: false, reason: `Must place in Ring ${activeRing} first` };
+    }
   }
 
   const tileNum = Number(tileId);

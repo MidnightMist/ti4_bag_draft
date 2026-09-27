@@ -364,15 +364,22 @@ export default function MapGrid({
   const placedTiles = room?.mapState?.placedTiles || {};
   const playerCount = room?.settings?.playerCount || players.length;
   const activeHexes = getActiveHexes(playerCount);
-  const activeRing = getCurrentActiveRing(placedTiles, activeHexes);
+  const activeRing = getCurrentActiveRing(placedTiles, activeHexes, playerCount);
+
+  const placeableHexes = playerCount === 7 ? activeHexes.filter(h => h.type !== 'home_system' && h.type !== 'hyperlane') : [];
+  const hexSlotMap = {};
+  placeableHexes.forEach((h, idx) => {
+    hexSlotMap[h.id] = idx + 1;
+  });
 
   // Rotation logic: if perspectiveSeatIndex is explicitly passed, use it;
-  // otherwise default to viewer home system at bottom (South, d=0)
+  // otherwise default to viewer home system at bottom (South, d=0).
+  // For 7-player map, the board is naturally asymmetric with fixed orientation matching the screenshot:
   let activeViewerSeat = 0;
   if (perspectiveSeatIndex !== null && perspectiveSeatIndex !== undefined) {
     activeViewerSeat = Number(perspectiveSeatIndex);
   } else if (mySlot) {
-    if (playerCount === 5 || playerCount === 4 || playerCount === 3) {
+    if (playerCount === 7 || playerCount === 5 || playerCount === 4 || playerCount === 3) {
       const myPlayerIdx = players.findIndex(p => p.slotId === mySlot.slotId);
       activeViewerSeat = myPlayerIdx >= 0 ? getSeatIndexForPlayer(myPlayerIdx, playerCount) : 0;
     } else {
@@ -380,13 +387,54 @@ export default function MapGrid({
       activeViewerSeat = viewerSeatIndex >= 0 ? viewerSeatIndex : 0;
     }
   }
-  const theta = -activeViewerSeat * (Math.PI / 3);
+  let theta = -activeViewerSeat * (Math.PI / 3);
+  if (playerCount === 7) {
+    const SEVEN_PLAYER_HOME_COORDS = {
+      0: { x: 0.0, y: -429.56 },
+      1: { x: 279.0, y: -161.09 },
+      2: { x: 279.0, y: 161.09 },
+      3: { x: 0.0, y: 429.56 },
+      4: { x: -279.0, y: 268.48 },
+      5: { x: -372.0, y: 0.0 },
+      6: { x: -279.0, y: -268.48 },
+    };
+    const coord = SEVEN_PLAYER_HOME_COORDS[activeViewerSeat] || { x: 0, y: -429.56 };
+    const origAngle = Math.atan2(coord.y, coord.x);
+    const targetAngle = Math.PI / 2; // South / bottom
+    let bestK = 0;
+    let minDiff = Infinity;
+    for (let k = 0; k < 6; k++) {
+      const rotAngle = origAngle + k * (Math.PI / 3);
+      const diff = Math.abs(Math.atan2(Math.sin(rotAngle - targetAngle), Math.cos(rotAngle - targetAngle)));
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestK = k;
+      }
+    }
+    theta = bestK * (Math.PI / 3);
+  }
+  let vbX = -490;
+  let vbY = -490;
+  let vbW = 980;
+  let vbH = 980;
+
+  if (playerCount === 7) {
+    vbX = -490;
+    vbY = -490;
+    vbW = 980;
+    vbH = 980;
+  }
+
   const cosT = Math.cos(theta);
   const sinT = Math.sin(theta);
+  const thetaDeg = theta * (180 / Math.PI);
 
   // Oriented label
   let orientedLabel = 'Player 1';
-  if (playerCount === 5 && activeViewerSeat === 0) {
+  if (playerCount === 7) {
+    const viewerPlayer = (mySlot && players.find(p => p.slotId === mySlot.slotId)) || players[0];
+    orientedLabel = `7-Player Galaxy (${viewerPlayer ? viewerPlayer.name : 'Player 1'})`;
+  } else if (playerCount === 5 && activeViewerSeat === 0) {
     orientedLabel = 'Overview (Hyperlanes South)';
   } else if (playerCount === 4 && activeViewerSeat === 0) {
     orientedLabel = 'Overview (Hyperlanes South/North)';
@@ -403,11 +451,15 @@ export default function MapGrid({
       id="map-grid-container"
       style={{
         width: '100%',
-        maxWidth: isFullscreen ? '100vw' : isCompleted ? '1140px' : '920px',
+        maxWidth: isFullscreen
+          ? '100vw'
+          : isCompleted
+            ? (playerCount === 7 ? '960px' : '1140px')
+            : (playerCount === 7 ? '840px' : '920px'),
         backgroundColor: isFullscreen ? '#0a0a12' : '#11111b',
         border: isFullscreen ? 'none' : '1px solid #272738',
         borderRadius: isFullscreen ? '0' : '16px',
-        padding: isFullscreen ? '20px 16px' : isCompleted ? '14px 16px 6px 16px' : '20px 16px',
+        padding: isFullscreen ? '20px 16px' : isCompleted ? '14px 16px 8px 16px' : '16px 16px 8px 16px',
         boxShadow: isFullscreen ? 'none' : '0 8px 32px rgba(0, 0, 0, 0.5)',
         display: 'flex',
         flexDirection: 'column',
@@ -562,12 +614,27 @@ export default function MapGrid({
         }}
       >
         <svg
-          viewBox={isCompleted ? "-348 -382 696 764" : "-440 -440 880 880"}
+          viewBox={
+            playerCount === 7
+              ? `${vbX} ${vbY} ${vbW} ${vbH}`
+              : (isCompleted ? "-348 -382 696 764" : "-440 -440 880 880")
+          }
           style={{
             width: '100%',
-            maxWidth: isFullscreen ? '94vh' : isCompleted ? '1060px' : '880px',
+            maxWidth: isFullscreen
+              ? '94vh'
+              : playerCount === 7
+                ? (isCompleted ? '960px' : '840px')
+                : (isCompleted ? '1060px' : '880px'),
+            maxHeight: isFullscreen
+              ? '92vh'
+              : isCompleted
+                ? 'calc(100vh - 120px)'
+                : 'calc(100vh - 280px)',
             height: 'auto',
-            aspectRatio: isCompleted ? '696 / 764' : '1 / 1',
+            aspectRatio: playerCount === 7
+              ? (isCompleted ? '820 / 1010' : '910 / 1110')
+              : (isCompleted ? '696 / 764' : '1 / 1'),
             display: 'block',
             transform: `scale(${zoomLevel})`,
             transformOrigin: 'center center',
@@ -595,7 +662,7 @@ export default function MapGrid({
           {/* Background Space Ring Orbits */}
           <circle cx="0" cy="0" r={H} fill="none" stroke="#252538" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
           <circle cx="0" cy="0" r={2 * H} fill="none" stroke="#252538" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
-          {playerCount !== 3 && (
+          {playerCount !== 3 && playerCount !== 7 && (
             <circle cx="0" cy="0" r={3 * H} fill="none" stroke="#252538" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
           )}
 
@@ -625,7 +692,7 @@ export default function MapGrid({
             const placed = placedTiles[hex.id];
 
             if (hex.type === 'home_system' && !placed) {
-              const isPlayerHome = playerCount !== 3 || [0, 2, 4].includes(hex.seatIndex);
+              const isPlayerHome = playerCount === 7 ? hex.seatIndex !== undefined : (playerCount !== 3 || [0, 2, 4].includes(hex.seatIndex));
               if (isPlayerHome) {
                 const player = getPlayerForSeatIndex(players, hex.seatIndex, playerCount) || {
                   name: `Player ${hex.seatIndex + 1}`,
@@ -663,9 +730,10 @@ export default function MapGrid({
             if (placed) {
               const isPending = Boolean(isMyTurn && selectedTileId && pendingHexId === hex.id);
               const isHyperlane = placed.isHyperlane;
-              // Hyperlane tiles keep base rotation defined in tile data plus counter-rotation by -activeViewerSeat * 60 degrees
+              // Hyperlane tiles keep base rotation defined in tile data plus counter-rotation
               const baseHyperlaneRotation = placed.rotation || 0;
-              const hyperlaneRotation = isHyperlane ? (baseHyperlaneRotation - activeViewerSeat * 60) : 0;
+              const slotNum = playerCount === 7 ? hexSlotMap[hex.id] : null;
+              const hyperlaneRotation = isHyperlane ? (baseHyperlaneRotation + (playerCount === 7 ? thetaDeg : -activeViewerSeat * 60)) : 0;
 
               return (
                 <HexTile
@@ -673,7 +741,8 @@ export default function MapGrid({
                   cx={rx}
                   cy={ry}
                   tileId={placed.tileId}
-                  label={isHyperlane ? `Hyperlane ${placed.tileId}` : `Tile ${placed.tileId}`}
+                  label={isHyperlane ? `Hyperlane ${placed.tileId}` : slotNum ? `Slot ${slotNum}` : `Tile ${placed.tileId}`}
+                  subLabel={slotNum ? `Tile ${placed.tileId}` : ''}
                   isPlaceholder={false}
                   isPending={isPending}
                   fill="#181824"
@@ -688,6 +757,7 @@ export default function MapGrid({
             }
 
             // Empty Hex Slot
+            const slotNum = playerCount === 7 ? hexSlotMap[hex.id] : null;
             const isActiveRingHex = hex.ring === activeRing && (hex.ring !== 3 || hex.type === 'ring3');
             const isPending = Boolean(isMyTurn && selectedTileId && pendingHexId === hex.id);
             const isClickable = isMyTurn && selectedTileId && isActiveRingHex;
@@ -715,8 +785,8 @@ export default function MapGrid({
                 cx={rx}
                 cy={ry}
                 tileId={isPending ? selectedTileId : null}
-                label={isPending ? `Tile ${selectedTileId}` : `Ring ${hex.ring}`}
-                subLabel={isPending ? 'Pending placement' : isActiveRingHex ? 'Active Ring' : ''}
+                label={isPending ? `Tile ${selectedTileId}` : slotNum ? `Slot ${slotNum}` : `Ring ${hex.ring}`}
+                subLabel={isPending ? 'Pending placement' : slotNum ? `Ring ${hex.ring}` : (isActiveRingHex ? 'Active Ring' : '')}
                 isPlaceholder={!isPending}
                 isPending={isPending}
                 fill={fill}

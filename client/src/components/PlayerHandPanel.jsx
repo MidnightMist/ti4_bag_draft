@@ -150,9 +150,9 @@ export default function PlayerHandPanel({ player, activeTileId, onSelectTile, on
     <div
       id="player-hand-panel"
       style={{
-        marginTop: '20px',
+        marginTop: '16px',
         width: '100%',
-        maxWidth: '920px',
+        maxWidth: '840px',
         backgroundColor: '#12121c',
         border: '1px solid #262638',
         borderRadius: '16px',
