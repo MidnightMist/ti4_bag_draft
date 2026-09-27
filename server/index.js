@@ -563,19 +563,13 @@ const PORT = process.env.PORT || 4000;
 
 // Serve static tile images from client/public/tiles or root /tiles
 const clientTiles = path.resolve(__dirname, '../client/public/tiles');
-if (fs.existsSync(clientTiles)) {
-  app.use('/tiles', express.static(clientTiles));
-}
+app.use('/tiles', express.static(clientTiles));
 const rootTiles = path.resolve(__dirname, '../tiles');
-if (fs.existsSync(rootTiles)) {
-  app.use('/tiles', express.static(rootTiles));
-}
+app.use('/tiles', express.static(rootTiles));
 
 // Serve static faction images from client/public/factions
 const clientFactions = path.resolve(__dirname, '../client/public/factions');
-if (fs.existsSync(clientFactions)) {
-  app.use('/factions', express.static(clientFactions));
-}
+app.use('/factions', express.static(clientFactions));
 
 const clientDist = path.resolve(__dirname, '../client/dist');
 if (fs.existsSync(clientDist)) {

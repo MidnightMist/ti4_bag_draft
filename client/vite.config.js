@@ -14,6 +14,12 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:4000',
       },
+      '/tiles': {
+        target: 'http://localhost:4000',
+      },
+      '/factions': {
+        target: 'http://localhost:4000',
+      },
     },
   },
 });
