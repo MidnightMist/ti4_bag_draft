@@ -164,7 +164,7 @@ export default function RoomView() {
 
   // Perspective calculation: default to viewer's claimed seat, or seat 0 (Player 1 in 6p, Overview in 5p/4p)
   const defaultPerspectiveSeat = myClaimedSlot
-    ? ((totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3)
+    ? ((totalSlots === 8 || totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3)
         ? getSeatIndexForPlayer(room.players.findIndex(p => p.slotId === myClaimedSlot.slotId), totalSlots)
         : room.players.findIndex(p => p.slotId === myClaimedSlot.slotId))
     : (totalSlots === 3 ? getSeatIndexForPlayer(0, 3) : 0);
@@ -593,7 +593,7 @@ export default function RoomView() {
                 )}
 
                 {room.players.map((player, playerIdx) => {
-                  const targetSeat = (totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3) ? getSeatIndexForPlayer(playerIdx, totalSlots) : playerIdx;
+                  const targetSeat = (totalSlots === 8 || totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3) ? getSeatIndexForPlayer(playerIdx, totalSlots) : playerIdx;
                   const isOriented = activePerspectiveSeat === targetSeat;
                   const isViewer = myClaimedSlot && myClaimedSlot.slotId === player.slotId;
 
@@ -651,7 +651,8 @@ export default function RoomView() {
                   id="rotate-ccw-btn"
                   onClick={() => setSelectedPerspectiveSeat((prev) => {
                     const cur = prev !== null ? prev : activePerspectiveSeat;
-                    return (cur + 5) % 6;
+                    const seatMod = totalSlots || 6;
+                    return (cur - 1 + seatMod) % seatMod;
                   })}
                   style={{
                     flex: 1,
@@ -664,7 +665,7 @@ export default function RoomView() {
                     fontWeight: '600',
                     cursor: 'pointer',
                   }}
-                  title="Rotate 60° Counter-Clockwise"
+                  title="Rotate Counter-Clockwise"
                 >
                   ↺ -60°
                 </button>
@@ -673,7 +674,8 @@ export default function RoomView() {
                   id="rotate-cw-btn"
                   onClick={() => setSelectedPerspectiveSeat((prev) => {
                     const cur = prev !== null ? prev : activePerspectiveSeat;
-                    return (cur + 1) % 6;
+                    const seatMod = totalSlots || 6;
+                    return (cur + 1) % seatMod;
                   })}
                   style={{
                     flex: 1,
@@ -686,7 +688,7 @@ export default function RoomView() {
                     fontWeight: '600',
                     cursor: 'pointer',
                   }}
-                  title="Rotate 60° Clockwise"
+                  title="Rotate Clockwise"
                 >
                   ↻ +60°
                 </button>
@@ -697,7 +699,7 @@ export default function RoomView() {
                     onClick={() => {
                       const myIdx = room.players.findIndex(p => p.slotId === myClaimedSlot.slotId);
                       if (myIdx >= 0) {
-                        const targetSeat = (totalSlots === 5 || totalSlots === 4 || totalSlots === 3) ? getSeatIndexForPlayer(myIdx, totalSlots) : myIdx;
+                        const targetSeat = (totalSlots === 8 || totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3) ? getSeatIndexForPlayer(myIdx, totalSlots) : myIdx;
                         setSelectedPerspectiveSeat(targetSeat);
                       }
                     }}
@@ -964,7 +966,7 @@ export default function RoomView() {
                   const initialBlue = totalSlots === 3 ? 6 : 3;
                   const blueCount = p.remainingBlue ?? p.hand?.blue?.length ?? initialBlue;
                   const redCount = p.remainingRed ?? p.hand?.red?.length ?? 2;
-                  const targetSeat = (totalSlots === 5 || totalSlots === 4 || totalSlots === 3)
+                  const targetSeat = (totalSlots === 8 || totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3)
                     ? getSeatIndexForPlayer(playerIdx, totalSlots)
                     : playerIdx;
                   const isOriented = activePerspectiveSeat === targetSeat;

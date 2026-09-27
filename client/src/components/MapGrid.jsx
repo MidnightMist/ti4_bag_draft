@@ -358,7 +358,6 @@ export default function MapGrid({
   isFullscreen = false,
   onToggleFullscreen,
 }) {
-  const [zoomLevel, setZoomLevel] = useState(1);
   const mecatolTileId = getMecatolTileId(room?.settings?.expansions);
   const players = room?.players || [];
   const placedTiles = room?.mapState?.placedTiles || {};
@@ -366,20 +365,14 @@ export default function MapGrid({
   const activeHexes = getActiveHexes(playerCount);
   const activeRing = getCurrentActiveRing(placedTiles, activeHexes, playerCount);
 
-  const placeableHexes = playerCount === 7 ? activeHexes.filter(h => h.type !== 'home_system' && h.type !== 'hyperlane') : [];
-  const hexSlotMap = {};
-  placeableHexes.forEach((h, idx) => {
-    hexSlotMap[h.id] = idx + 1;
-  });
-
   // Rotation logic: if perspectiveSeatIndex is explicitly passed, use it;
   // otherwise default to viewer home system at bottom (South, d=0).
-  // For 7-player map, the board is naturally asymmetric with fixed orientation matching the screenshot:
+  // For 7-player and 8-player maps, the board is naturally oriented with fixed upright orientation matching the reference layout:
   let activeViewerSeat = 0;
   if (perspectiveSeatIndex !== null && perspectiveSeatIndex !== undefined) {
     activeViewerSeat = Number(perspectiveSeatIndex);
   } else if (mySlot) {
-    if (playerCount === 7 || playerCount === 5 || playerCount === 4 || playerCount === 3) {
+    if (playerCount === 8 || playerCount === 7 || playerCount === 5 || playerCount === 4 || playerCount === 3) {
       const myPlayerIdx = players.findIndex(p => p.slotId === mySlot.slotId);
       activeViewerSeat = myPlayerIdx >= 0 ? getSeatIndexForPlayer(myPlayerIdx, playerCount) : 0;
     } else {
@@ -388,7 +381,32 @@ export default function MapGrid({
     }
   }
   let theta = -activeViewerSeat * (Math.PI / 3);
-  if (playerCount === 7) {
+  if (playerCount === 8) {
+    const EIGHT_PLAYER_HOME_COORDS = {
+      0: { x: 0.0, y: -429.54 },
+      1: { x: 279.0, y: -268.48 },
+      2: { x: 372.0, y: 0.0 },
+      3: { x: 279.0, y: 268.48 },
+      4: { x: 0.0, y: 429.54 },
+      5: { x: -279.0, y: 268.48 },
+      6: { x: -372.0, y: 0.0 },
+      7: { x: -279.0, y: -268.48 },
+    };
+    const coord = EIGHT_PLAYER_HOME_COORDS[activeViewerSeat] || { x: 0, y: -429.54 };
+    const origAngle = Math.atan2(coord.y, coord.x);
+    const targetAngle = Math.PI / 2; // South / bottom
+    let bestK = 0;
+    let minDiff = Infinity;
+    for (let k = 0; k < 6; k++) {
+      const rotAngle = origAngle + k * (Math.PI / 3);
+      const diff = Math.abs(Math.atan2(Math.sin(rotAngle - targetAngle), Math.cos(rotAngle - targetAngle)));
+      if (diff < minDiff) {
+        minDiff = diff;
+        bestK = k;
+      }
+    }
+    theta = bestK * (Math.PI / 3);
+  } else if (playerCount === 7) {
     const SEVEN_PLAYER_HOME_COORDS = {
       0: { x: 0.0, y: -429.56 },
       1: { x: 279.0, y: -161.09 },
@@ -418,7 +436,12 @@ export default function MapGrid({
   let vbW = 980;
   let vbH = 980;
 
-  if (playerCount === 7) {
+  if (playerCount === 8) {
+    vbX = -500;
+    vbY = -540;
+    vbW = 1000;
+    vbH = 1080;
+  } else if (playerCount === 7) {
     vbX = -490;
     vbY = -490;
     vbW = 980;
@@ -431,9 +454,9 @@ export default function MapGrid({
 
   // Oriented label
   let orientedLabel = 'Player 1';
-  if (playerCount === 7) {
-    const viewerPlayer = (mySlot && players.find(p => p.slotId === mySlot.slotId)) || players[0];
-    orientedLabel = `7-Player Galaxy (${viewerPlayer ? viewerPlayer.name : 'Player 1'})`;
+  if (playerCount === 8 || playerCount === 7) {
+    const p = getPlayerForSeatIndex(players, activeViewerSeat, playerCount) || players[activeViewerSeat];
+    orientedLabel = p ? `${playerCount}-Player Galaxy (${p.name})` : `${playerCount}-Player Galaxy`;
   } else if (playerCount === 5 && activeViewerSeat === 0) {
     orientedLabel = 'Overview (Hyperlanes South)';
   } else if (playerCount === 4 && activeViewerSeat === 0) {
@@ -516,66 +539,6 @@ export default function MapGrid({
             )}
           </span>
 
-          {/* Zoom & Fullscreen Controls */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', backgroundColor: '#1c1c2b', padding: '3px', borderRadius: '6px', border: '1px solid #323248' }}>
-            <button
-              onClick={() => setZoomLevel(z => Math.max(0.7, Math.round((z - 0.1) * 10) / 10))}
-              disabled={zoomLevel <= 0.7}
-              style={{
-                backgroundColor: '#272738',
-                border: 'none',
-                color: zoomLevel <= 0.7 ? '#4b5563' : '#d1d5db',
-                borderRadius: '4px',
-                width: '24px',
-                height: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: zoomLevel <= 0.7 ? 'not-allowed' : 'pointer',
-                fontWeight: 'bold',
-                fontSize: '13px',
-              }}
-              title="Zoom Out"
-            >
-              -
-            </button>
-            <button
-              onClick={() => setZoomLevel(1)}
-              style={{
-                backgroundColor: 'transparent',
-                border: 'none',
-                color: '#9ca3af',
-                fontSize: '11px',
-                padding: '0 4px',
-                cursor: 'pointer',
-              }}
-              title="Reset Zoom"
-            >
-              {Math.round(zoomLevel * 100)}%
-            </button>
-            <button
-              onClick={() => setZoomLevel(z => Math.min(1.8, Math.round((z + 0.1) * 10) / 10))}
-              disabled={zoomLevel >= 1.8}
-              style={{
-                backgroundColor: '#272738',
-                border: 'none',
-                color: zoomLevel >= 1.8 ? '#4b5563' : '#d1d5db',
-                borderRadius: '4px',
-                width: '24px',
-                height: '24px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                cursor: zoomLevel >= 1.8 ? 'not-allowed' : 'pointer',
-                fontWeight: 'bold',
-                fontSize: '13px',
-              }}
-              title="Zoom In"
-            >
-              +
-            </button>
-          </div>
-
           {onToggleFullscreen && (
             <button
               id="map-toggle-fullscreen-btn"
@@ -615,7 +578,7 @@ export default function MapGrid({
       >
         <svg
           viewBox={
-            playerCount === 7
+            (playerCount === 7 || playerCount === 8)
               ? `${vbX} ${vbY} ${vbW} ${vbH}`
               : (isCompleted ? "-348 -382 696 764" : "-440 -440 880 880")
           }
@@ -623,7 +586,7 @@ export default function MapGrid({
             width: '100%',
             maxWidth: isFullscreen
               ? '94vh'
-              : playerCount === 7
+              : (playerCount === 7 || playerCount === 8)
                 ? (isCompleted ? '960px' : '840px')
                 : (isCompleted ? '1060px' : '880px'),
             maxHeight: isFullscreen
@@ -632,13 +595,10 @@ export default function MapGrid({
                 ? 'calc(100vh - 120px)'
                 : 'calc(100vh - 280px)',
             height: 'auto',
-            aspectRatio: playerCount === 7
+            aspectRatio: (playerCount === 7 || playerCount === 8)
               ? (isCompleted ? '820 / 1010' : '910 / 1110')
               : (isCompleted ? '696 / 764' : '1 / 1'),
             display: 'block',
-            transform: `scale(${zoomLevel})`,
-            transformOrigin: 'center center',
-            transition: 'transform 0.15s ease-out',
           }}
         >
           <defs>
@@ -662,11 +622,11 @@ export default function MapGrid({
           {/* Background Space Ring Orbits */}
           <circle cx="0" cy="0" r={H} fill="none" stroke="#252538" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
           <circle cx="0" cy="0" r={2 * H} fill="none" stroke="#252538" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
-          {playerCount !== 3 && playerCount !== 7 && (
+          {playerCount !== 3 && playerCount !== 7 && playerCount !== 8 && (
             <circle cx="0" cy="0" r={3 * H} fill="none" stroke="#252538" strokeWidth="1" strokeDasharray="3 4" opacity="0.6" />
           )}
 
-          {/* Render All 37 Hexes */}
+          {/* Render All Hexes */}
           {activeHexes.map((hex) => {
             const rx = hex.x * cosT - hex.y * sinT;
             const ry = hex.x * sinT + hex.y * cosT;
@@ -692,7 +652,7 @@ export default function MapGrid({
             const placed = placedTiles[hex.id];
 
             if (hex.type === 'home_system' && !placed) {
-              const isPlayerHome = playerCount === 7 ? hex.seatIndex !== undefined : (playerCount !== 3 || [0, 2, 4].includes(hex.seatIndex));
+              const isPlayerHome = (playerCount === 7 || playerCount === 8) ? hex.seatIndex !== undefined : (playerCount !== 3 || [0, 2, 4].includes(hex.seatIndex));
               if (isPlayerHome) {
                 const player = getPlayerForSeatIndex(players, hex.seatIndex, playerCount) || {
                   name: `Player ${hex.seatIndex + 1}`,
@@ -732,8 +692,7 @@ export default function MapGrid({
               const isHyperlane = placed.isHyperlane;
               // Hyperlane tiles keep base rotation defined in tile data plus counter-rotation
               const baseHyperlaneRotation = placed.rotation || 0;
-              const slotNum = playerCount === 7 ? hexSlotMap[hex.id] : null;
-              const hyperlaneRotation = isHyperlane ? (baseHyperlaneRotation + (playerCount === 7 ? thetaDeg : -activeViewerSeat * 60)) : 0;
+              const hyperlaneRotation = isHyperlane ? (baseHyperlaneRotation + ((playerCount === 7 || playerCount === 8) ? thetaDeg : -activeViewerSeat * 60)) : 0;
 
               return (
                 <HexTile
@@ -741,8 +700,8 @@ export default function MapGrid({
                   cx={rx}
                   cy={ry}
                   tileId={placed.tileId}
-                  label={isHyperlane ? `Hyperlane ${placed.tileId}` : slotNum ? `Slot ${slotNum}` : `Tile ${placed.tileId}`}
-                  subLabel={slotNum ? `Tile ${placed.tileId}` : ''}
+                  label={isHyperlane ? `Hyperlane ${placed.tileId}` : `Tile ${placed.tileId}`}
+                  subLabel=""
                   isPlaceholder={false}
                   isPending={isPending}
                   fill="#181824"
@@ -757,8 +716,7 @@ export default function MapGrid({
             }
 
             // Empty Hex Slot
-            const slotNum = playerCount === 7 ? hexSlotMap[hex.id] : null;
-            const isActiveRingHex = hex.ring === activeRing && (hex.ring !== 3 || hex.type === 'ring3');
+            const isActiveRingHex = hex.ring === activeRing && (hex.ring !== 3 || hex.type === 'ring3' || hex.type === 'ring_system');
             const isPending = Boolean(isMyTurn && selectedTileId && pendingHexId === hex.id);
             const isClickable = isMyTurn && selectedTileId && isActiveRingHex;
 
@@ -785,8 +743,8 @@ export default function MapGrid({
                 cx={rx}
                 cy={ry}
                 tileId={isPending ? selectedTileId : null}
-                label={isPending ? `Tile ${selectedTileId}` : slotNum ? `Slot ${slotNum}` : `Ring ${hex.ring}`}
-                subLabel={isPending ? 'Pending placement' : slotNum ? `Ring ${hex.ring}` : (isActiveRingHex ? 'Active Ring' : '')}
+                label={isPending ? `Tile ${selectedTileId}` : `Ring ${hex.ring}`}
+                subLabel={isPending ? 'Pending placement' : (isActiveRingHex ? 'Active Ring' : '')}
                 isPlaceholder={!isPending}
                 isPending={isPending}
                 fill={fill}

@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { DEFAULT_BLUE_TILES, getDefaultTiersForExpansions } from './data/blueTiles.js';
 import { validateBlueTiers } from './data/tierValidator.js';
-import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, ALL_37_HEXES, getActiveHexes, FIVE_PLAYER_HYPERLANES, FOUR_PLAYER_HYPERLANES, SEVEN_PLAYER_HYPERLANES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
+import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, ALL_37_HEXES, getActiveHexes, FIVE_PLAYER_HYPERLANES, FOUR_PLAYER_HYPERLANES, SEVEN_PLAYER_HYPERLANES, EIGHT_PLAYER_HYPERLANES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -170,7 +170,7 @@ app.post('/api/rooms', (req, res) => {
     }
 
     const roomId = generateRoomId();
-    const initialPlacedTiles = count === 7 ? { ...SEVEN_PLAYER_HYPERLANES } : count === 5 ? { ...FIVE_PLAYER_HYPERLANES } : count === 4 ? { ...FOUR_PLAYER_HYPERLANES } : {};
+    const initialPlacedTiles = count === 8 ? { ...EIGHT_PLAYER_HYPERLANES } : count === 7 ? { ...SEVEN_PLAYER_HYPERLANES } : count === 5 ? { ...FIVE_PLAYER_HYPERLANES } : count === 4 ? { ...FOUR_PLAYER_HYPERLANES } : {};
 
     const roomData = {
       id: roomId,
@@ -472,7 +472,7 @@ io.on('connection', (socket) => {
     });
     room.players.sort((a, b) => a.slotId - b.slotId);
     dealPlayerHands(room);
-    const resetPlacedTiles = playerCount === 7 ? { ...SEVEN_PLAYER_HYPERLANES } : playerCount === 5 ? { ...FIVE_PLAYER_HYPERLANES } : playerCount === 4 ? { ...FOUR_PLAYER_HYPERLANES } : {};
+    const resetPlacedTiles = playerCount === 8 ? { ...EIGHT_PLAYER_HYPERLANES } : playerCount === 7 ? { ...SEVEN_PLAYER_HYPERLANES } : playerCount === 5 ? { ...FIVE_PLAYER_HYPERLANES } : playerCount === 4 ? { ...FOUR_PLAYER_HYPERLANES } : {};
     room.mapState = {
       placedTiles: resetPlacedTiles,
       speakerSlotId: null,

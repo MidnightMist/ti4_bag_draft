@@ -358,4 +358,31 @@
      - Slot 10 (`ring-1-pos15`) <--> Slot 5 (`center`)
      - Slot 10 (`ring-1-pos15`) <--> Slot 11 (`ring-1-pos35`)
      - Slot 16 (`ring-2-pos2`) <--> Slot 11 (`ring-1-pos35`)
+6. **8-Player Map Layout & Distance-Based Rings (PoK Hyperlanes Standard):**
+   - Asymmetric/symmetric 9-column galaxy layout (columns -4 to +4, spanning 55 total hexes) matching the user reference blueprint.
+   - **Total Hexes (55):**
+     - 1 Center hex: `center` (Mecatol Rex, col 0, row 0, Ring 0).
+     - 8 Home Systems: `home-p1` to `home-p8` clockwise around perimeter.
+     - 6 Fixed Hyperlane Tiles: `hl-87A` (col 0, row -1), `hl-88A` (col 0, row 1), `hl-90B` (col 1, row -0.5), `hl-89B` (col -1, row 0.5), `hl-85B` (col 3, row 0.5), `hl-83B` (col -3, row -0.5).
+     - 40 Draftable Ring System Slots: 8 in Ring 1, 16 in Ring 2, 16 in Ring 3.
+   - **Display & Target Hex Format:**
+     - Slots numbered sequentially 1–41 (matching column-major order with Mecatol Rex at Slot 3).
+     - Every empty spot displays both primary label `Slot ${num}` and secondary label `${id} • R${ring}`.
+     - When clicked, the bottom placement bar displays `Target Hex: Slot ${num} (${id})`.
+     - ViewBox: `-490 -515 980 1030` (`aspectRatio: '980 / 1030'`).
+   - **8-Player Neighborhood Adjacency Rules (`extraAdjacencyMap8`):**
+     - Slot 28 (`ring-neg1-pos15`) <--> Slot 27 (`ring-neg1-neg05`)
+     - Slot 35 (`ring-neg2-pos1`) <--> Slot 27 (`ring-neg1-neg05`)
+     - Slot 8 (`ring-1-neg15`) <--> Slot 9 (`ring-1-pos05`)
+     - Slot 9 (`ring-1-pos05`) <--> Slot 15 (`ring-2-neg1`)
+     - Slot 41 (`ring-neg4-neg1`) <--> Slot 33 (`ring-neg2-neg1`)
+     - Slot 41 (`ring-neg4-neg1`) <--> Slot 34 (`ring-neg2-0`)
+     - Slot 16 (`ring-2-0`) <--> Slot 23 (`ring-4-pos1`)
+     - Slot 17 (`ring-2-pos1`) <--> Slot 23 (`ring-4-pos1`)
+   - **8-Player Dynamic Player Perspective & Map Rotation:**
+     - When switching between players (clicking on a player in the Table Seating Order, lobby perspective list, or using the ↻/↺ rotation controls), the board rotates so that the selected player's home system is positioned at the bottom (South, facing Mecatol Rex) using hex-grid aligned 60° increments (`bestK * Math.PI / 3`), preserving flat-topped hex geometry and upright text labels.
+     - Hyperlane tiles counter-rotate by `+thetaDeg` to maintain correct hyperlane corridor alignment.
+     - Step rotation controls (CW/CCW) use modulo `totalSlots` (8) to smoothly cycle across all player seats.
+     - ViewBox updated to `-500 -540 1000 1080` to cleanly accommodate all rotations and the remaining tile count badges without clipping.
+
 
