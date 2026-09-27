@@ -44,7 +44,7 @@
   - When all `N` players claim their slots, the room state transitions from `"lobby"` to active map creation (`map_building`).
 - **Transition Trigger (Bag Draft):**
   - When all `N` players claim their slots, Bag Draft rooms transition to **Step 1: Faction Banning (`faction_ban`)**.
-  - **Randomized Speaker & Seating:** Speaker is randomly selected from claimed players, and players are simultaneously seated in a random order.
+  - **Randomized Seating Order:** Players are seated in a randomized order relative to each other for the draft. Speaker is NOT determined during the draft; the Speaker will be chosen later when the draft finishes and map building begins.
   - **Faction Banning Step (`faction_ban`):**
     - Each player is automatically assigned 3 random factions from the chosen draft pool (`selectedFactions`).
     - Players view their 3 faction cards with images from `/factions/` and select one to ban.

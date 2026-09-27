@@ -70,20 +70,24 @@ function startMapBuilding(room) {
 
 function startFactionBan(room) {
   room.status = 'faction_ban';
-  const speakerIndex = Math.floor(Math.random() * room.players.length);
-  const speakerPlayer = room.players[speakerIndex];
-  const otherPlayers = room.players.filter((_, idx) => idx !== speakerIndex);
-  const shuffledOthers = shuffle(otherPlayers);
-  room.players = [speakerPlayer, ...shuffledOthers];
-  room.players.forEach((p, idx) => {
-    p.isSpeaker = (idx === 0);
+  // Randomize player seating order relative to each other for the draft
+  room.players = shuffle(room.players);
+  // Ensure no speaker is assigned during the draft phase
+  room.players.forEach((p) => {
+    p.isSpeaker = false;
   });
-  room.mapState.speakerSlotId = room.players[0].slotId;
+  room.mapState.speakerSlotId = null;
 
-  const selectedFactionIds = room.settings.selectedFactions || FACTIONS.map(f => f.id);
-  room.players.forEach(p => {
-    const pool = shuffle(selectedFactionIds);
-    p.banPool = pool.slice(0, 3);
+  const selectedFactionIds = (room.settings.selectedFactions && room.settings.selectedFactions.length >= room.players.length * 3)
+    ? [...room.settings.selectedFactions]
+    : FACTIONS.map(f => f.id);
+
+  // Shuffle pool once so every player receives a strictly unique set of 3 factions without any duplicates
+  const shuffledFactions = shuffle(selectedFactionIds);
+
+  room.players.forEach((p, idx) => {
+    // Deal 3 unique factions to each player from the shared shuffled pool
+    p.banPool = shuffledFactions.slice(idx * 3, (idx + 1) * 3);
     p.bannedFactionId = null;
     p.hasBanned = false;
   });
