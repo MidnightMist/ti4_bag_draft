@@ -8,6 +8,7 @@ import fs from 'fs';
 import { DEFAULT_BLUE_TILES, getDefaultTiersForExpansions } from './data/blueTiles.js';
 import { validateBlueTiers } from './data/tierValidator.js';
 import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, ALL_37_HEXES, getActiveHexes, FIVE_PLAYER_HYPERLANES, FOUR_PLAYER_HYPERLANES, SEVEN_PLAYER_HYPERLANES, EIGHT_PLAYER_HYPERLANES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
+import { FACTIONS } from './data/factionsData.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,6 +66,35 @@ function startMapBuilding(room) {
   });
   room.mapState.speakerSlotId = room.players[0].slotId;
   dealPlayerHands(room);
+}
+
+function startFactionBan(room) {
+  room.status = 'faction_ban';
+  const speakerIndex = Math.floor(Math.random() * room.players.length);
+  const speakerPlayer = room.players[speakerIndex];
+  const otherPlayers = room.players.filter((_, idx) => idx !== speakerIndex);
+  const shuffledOthers = shuffle(otherPlayers);
+  room.players = [speakerPlayer, ...shuffledOthers];
+  room.players.forEach((p, idx) => {
+    p.isSpeaker = (idx === 0);
+  });
+  room.mapState.speakerSlotId = room.players[0].slotId;
+
+  const selectedFactionIds = room.settings.selectedFactions || FACTIONS.map(f => f.id);
+  room.players.forEach(p => {
+    const pool = shuffle(selectedFactionIds);
+    p.banPool = pool.slice(0, 3);
+    p.bannedFactionId = null;
+    p.hasBanned = false;
+    if (p.claimedBy && p.claimedBy.startsWith('sim_bot_')) {
+      p.bannedFactionId = p.banPool[0];
+      p.hasBanned = true;
+    }
+  });
+
+  if (room.players.every(p => p.hasBanned)) {
+    room.status = 'drafting';
+  }
 }
 
 /**
@@ -140,7 +170,9 @@ app.post('/api/rooms', (req, res) => {
       playerNames = [],
       expansions = { pok: true, thundersEdge: true },
       tileMode = 'balanced', // 'random' | 'balanced'
-      balanceTiers = null
+      balanceTiers = null,
+      gameMode = 'map', // 'map' | 'draft'
+      selectedFactions = []
     } = req.body;
 
     const count = Math.min(Math.max(parseInt(playerCount, 10) || 6, 3), 8);
@@ -177,10 +209,12 @@ app.post('/api/rooms', (req, res) => {
       createdAt: Date.now(),
       status: 'lobby', // 'lobby' | 'map_building' | 'completed'
       settings: {
+        gameMode,
         playerCount: count,
         expansions,
         tileMode,
-        balanceTiers: normalizedTiers
+        balanceTiers: normalizedTiers,
+        selectedFactions
       },
       players: formattedPlayers,
       mapState: {
@@ -273,7 +307,11 @@ io.on('connection', (socket) => {
     // Check if all players are claimed
     const allClaimed = room.players.every(p => p.claimedBy !== null);
     if (allClaimed && room.status === 'lobby') {
-      startMapBuilding(room);
+      if (room.settings.gameMode === 'draft') {
+        startFactionBan(room);
+      } else {
+        startMapBuilding(room);
+      }
     }
 
     io.to(roomId).emit('room_state', room);
@@ -288,7 +326,7 @@ io.on('connection', (socket) => {
     if (slot && validUserId && slot.claimedBy === validUserId) {
       slot.claimedBy = null;
       slot.claimedAt = null;
-      if (room.status === 'map_building') {
+      if (room.status === 'map_building' || room.status === 'faction_ban') {
         room.status = 'lobby';
         room.players.sort((a, b) => a.slotId - b.slotId);
       }
@@ -333,8 +371,46 @@ io.on('connection', (socket) => {
     });
 
     const allClaimed = room.players.every(p => p.claimedBy !== null);
-    if (allClaimed && room.status === 'lobby') {
-      startMapBuilding(room);
+    if (allClaimed) {
+      if (room.settings && room.settings.gameMode === 'draft') {
+        startFactionBan(room);
+      } else {
+        startMapBuilding(room);
+      }
+    }
+
+    io.to(roomId).emit('room_state', room);
+  });
+
+  socket.on('submit_faction_ban', ({ roomId, slotId, factionId }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.status !== 'faction_ban') {
+      socket.emit('room_error', { message: 'Room not in faction ban phase' });
+      return;
+    }
+
+    const player = room.players.find(p => p.slotId === slotId);
+    if (!player) {
+      socket.emit('room_error', { message: 'Player slot not found' });
+      return;
+    }
+
+    if (player.hasBanned) {
+      socket.emit('room_error', { message: 'You have already submitted your ban' });
+      return;
+    }
+
+    if (!player.banPool || !player.banPool.includes(factionId)) {
+      socket.emit('room_error', { message: 'Invalid faction selected for ban' });
+      return;
+    }
+
+    player.bannedFactionId = factionId;
+    player.hasBanned = true;
+
+    const allBanned = room.players.every(p => p.hasBanned);
+    if (allBanned) {
+      room.status = 'drafting';
     }
 
     io.to(roomId).emit('room_state', room);
@@ -497,6 +573,12 @@ if (fs.existsSync(clientTiles)) {
 const rootTiles = path.resolve(__dirname, '../tiles');
 if (fs.existsSync(rootTiles)) {
   app.use('/tiles', express.static(rootTiles));
+}
+
+// Serve static faction images from client/public/factions
+const clientFactions = path.resolve(__dirname, '../client/public/factions');
+if (fs.existsSync(clientFactions)) {
+  app.use('/factions', express.static(clientFactions));
 }
 
 const clientDist = path.resolve(__dirname, '../client/dist');

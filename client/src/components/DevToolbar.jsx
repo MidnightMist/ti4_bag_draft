@@ -96,9 +96,9 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
               id="dev-autofill-btn"
               onClick={handleAutoFill}
               style={actionBtnStyle('#2563eb', '#1d4ed8')}
-              title="Fills any unassigned seats with mock players so map building starts instantly"
+              title="Fills remaining seats with mock players and starts the room"
             >
-              ⚡ Auto-Fill Lobby & Start Draft
+              ⚡ {room.settings?.gameMode === 'draft' ? 'Auto-Fill Lobby & Start Faction Ban' : 'Auto-Fill Lobby & Start Map Building'}
             </button>
 
             {room.status === 'map_building' && (

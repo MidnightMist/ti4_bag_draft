@@ -17,29 +17,18 @@
 
 ---
 
-## 2. Core Feature: Random Map Creation (Phased Flow)
+## 2. Core Feature: Random Map Creation & Bag Draft Setup
 
-### Phase 1: Room Creation & Settings (`CreateRoom.jsx`, `/map`)
-- **Player Count:** 3 to 8 players (default 6). Dynamically adjusts player name inputs.
-- **Player Names:** Slot 1..N with custom names or defaults (`Player 1`, `Player 2`, etc.).
-- **Expansions:**
-  - Base Game (always included).
-  - Prophecy of Kings (PoK) — togglable.
-  - Thunder's Edge — togglable.
-  *(Note: UI labels show only the expansion names without confusing raw tile ID ranges).*
-- **Tile Distribution Mode:**
-  - **Random Tiles**
-  - **Balanced Tiles (3 Tiers)**: Blue tiles split into Tier 1 (High), Tier 2 (Medium), Tier 3 (Base).
-- **Balance Tier Customization Modal:**
-  - Allows editing comma-separated tile lists for each tier.
-  - Dynamically updates default tiers when expansions are toggled.
-  - "Reset to Default" button restores presets for currently active expansions.
-  - Strict validator (`validateBlueTiers` on client and server):
-    1. Rejects invalid non-numeric tokens.
-    2. Rejects tiles outside active expansions.
-    3. Rejects duplicate tiles within the same tier.
-    4. Rejects overlapping tiles between tiers.
-    5. Rejects missing tiles (every single active blue tile must be assigned to exactly one tier).
+### Phase 1: Room Creation & Settings (`CreateRoom.jsx`, `CreateDraftRoom.jsx`, `/map`, `/draft`)
+- **Random Map Creation Setup (`/map` - `CreateRoom.jsx`):**
+  - Player Count (3-8), Custom Player Names, Expansions (PoK, Thunder's Edge).
+  - Tile Distribution Mode: Random Tiles or Balanced Tiles (3 Tiers with tier customization and strict `validateBlueTiers` validation).
+- **Bag Draft Room Setup (`/draft` - `CreateDraftRoom.jsx`):**
+  - Similar to Random Map Creation setup.
+  - **Balanced Tiles Only:** Balanced tiles (3 Tiers) is always enabled by default with tier customization; the random/balanced mode switcher is omitted.
+  - **Faction Selection (30 Factions):** Checkboxes for all 30 factions categorized into Base Game (18), Prophecy of Kings (7), and Thunder's Edge (5). Faction names are cleaned up from filenames (`TI4 - ...` prefix removed).
+  - **Expansion-Driven Faction Filtering:** Toggling Prophecy of Kings or Thunder's Edge expansions automatically enables/disables and checks/unchecks the corresponding expansion factions.
+  - Static serving of faction images at `/factions` from `client/public/factions/`.
 
 ### Phase 2: Lobby & Claim System (`RoomView.jsx`, `/room/:roomId`)
 - **Unique Shareable URL:** `/room/:roomId` with one-click "Copy Link for Players".
@@ -47,10 +36,17 @@
   - Each player opens the URL and claims their slot.
   - Once claimed, the slot is locked to that user's ID and highlighted in blue. Other players see it as "Claimed".
   - A player can unclaim/release their slot if needed.
-- **Transition Trigger:**
+- **Transition Trigger (Random Map):**
   - When all `N` players claim their slots, the room state transitions from `"lobby"` to active map creation (`map_building`).
-  - **Randomized Speaker & Seating:** Speaker is randomly selected from claimed players, and players are simultaneously seated in a random order around the table (rather than sequential slot order).
-  - Reverting back to lobby (reset or unclaim) restores the sorted slot order.
+- **Transition Trigger (Bag Draft):**
+  - When all `N` players claim their slots, Bag Draft rooms transition to **Step 1: Faction Banning (`faction_ban`)**.
+  - **Randomized Speaker & Seating:** Speaker is randomly selected from claimed players, and players are simultaneously seated in a random order.
+  - **Faction Banning Step (`faction_ban`):**
+    - Each player is automatically assigned 3 random factions from the chosen draft pool (`selectedFactions`).
+    - Players view their 3 faction cards with images from `/factions/` and select one to ban.
+    - Upon clicking "Confirm Ban", the selection is locked and sent via Socket.IO (`submit_faction_ban`).
+    - Simulated bots auto-ban immediately upon auto-fill for testing/simulation.
+    - Once all players have submitted their bans, the room advances to the next draft stage (`drafting`).
 
 ### Phase 2.1: Developer & Testing Toolbar (`DevToolbar.jsx`)
 - **Single-Seat Quick Testing:**
