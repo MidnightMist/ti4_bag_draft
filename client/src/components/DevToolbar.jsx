@@ -31,6 +31,11 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
     socket.emit('dev_complete_map', { roomId: room.id });
   };
 
+  const handleAutoBan = () => {
+    if (!socket) return;
+    socket.emit('dev_autoban_room', { roomId: room.id });
+  };
+
   const handleOpenPlayerTab = (slotIndex) => {
     const targetUrl = `${window.location.origin}/room/${room.id}?user=p${slotIndex + 1}`;
     window.open(targetUrl, `_blank`);
@@ -109,6 +114,17 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
                 title="Immediately completes map creation with remaining tiles"
               >
                 🏁 Fast-Forward & Complete Map
+              </button>
+            )}
+
+            {room.status === 'faction_ban' && (
+              <button
+                id="dev-autoban-btn"
+                onClick={handleAutoBan}
+                style={actionBtnStyle('#d97706', '#b45309')}
+                title="Immediately submits default bans for all remaining players to enter Drafting phase"
+              >
+                ⚡ Fast-Forward Bans & Start Draft
               </button>
             )}
 

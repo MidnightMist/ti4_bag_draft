@@ -51,6 +51,17 @@
     - Upon clicking "Confirm Ban", the selection is locked and sent via Socket.IO (`submit_faction_ban`).
     - Simulated bots auto-ban immediately upon auto-fill for testing/simulation.
     - Once all players have submitted their bans, the room advances to the next draft stage (`drafting`).
+  - **Step 2: Bag Draft Active Interface (`drafting` in `DraftingPhaseView.jsx`):**
+    - **Pool Dealing:**
+      - The 2 factions kept by each player after ban are shuffled back into a shared pool. Each player receives 2 random factions from this post-ban pool (no duplicate factions across players).
+      - Each player is dealt 5 system tiles: 3 Blue (1 Tier 1, 1 Tier 2, 1 Tier 3) + 2 Red tiles (no duplicate tiles across players).
+    - **Screen Structure (3 Zones):**
+      - **Top Zone:** Seen elements strip (shows factions and tiles seen during draft: initially the 2 factions seen during ban phase + 5 tiles and 2 factions received now; no duplicates).
+      - **Central Zone (Dominant):** Current draft hand containing the 2 faction sheets and 5 system tiles.
+      - **Bottom Zone:** Accumulator strip for elements picked by the player during the draft (initially empty).
+    - **Hover Enlarged Previews (`DraftItemZoomPreview.jsx`):** Enlarged tooltip preview for all tiles and factions across all 3 zones.
+    - **Secret Status:** Hands are secret. Other players only see the count of picks made by each player.
+    - **Dev Toolbar:** Allows switching active seat between players for easy multi-seat debugging.
 
 ### Phase 2.1: Developer & Testing Toolbar (`DevToolbar.jsx`)
 - **Single-Seat Quick Testing:**

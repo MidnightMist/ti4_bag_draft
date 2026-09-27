@@ -93,8 +93,97 @@ function startFactionBan(room) {
   });
 
   if (room.players.every(p => p.hasBanned)) {
-    room.status = 'drafting';
+    startDraftingPhase(room);
   }
+}
+
+function startDraftingPhase(room) {
+  room.status = 'drafting';
+
+  // 1. Gather all non-banned factions from players' ban pools into a shared pool
+  const keptFactions = [];
+  room.players.forEach(p => {
+    (p.banPool || []).forEach(fId => {
+      if (fId !== p.bannedFactionId) {
+        keptFactions.push(fId);
+      }
+    });
+  });
+
+  // Shuffle the kept factions to deal 2 random factions to each player without duplicates
+  const shuffledDraftFactions = shuffle(keptFactions);
+
+  // 2. Deal tiles (3 Blue: 1 Tier 1, 1 Tier 2, 1 Tier 3; 2 Red)
+  const expansions = room.settings.expansions;
+  const mecatolId = getMecatolTileId(expansions);
+  const isBalanced = room.settings.tileMode === 'balanced';
+  const playerCount = room.settings.playerCount || room.players.length;
+
+  const redPool = shuffle(getActiveRedTiles(expansions));
+
+  let t1 = [], t2 = [], t3 = [], bluePool = [];
+  if (isBalanced) {
+    const tiers = room.settings.balanceTiers || getDefaultTiersForExpansions(expansions);
+    t1 = shuffle((tiers.tier1 || []).filter(id => id !== mecatolId));
+    t2 = shuffle((tiers.tier2 || []).filter(id => id !== mecatolId));
+    t3 = shuffle((tiers.tier3 || []).filter(id => id !== mecatolId));
+  } else {
+    bluePool = shuffle(getActiveBlueTiles(expansions).filter(id => id !== mecatolId));
+  }
+
+  // 3. Initialize each player's draft state
+  room.players.forEach((p, idx) => {
+    // Deal tiles
+    const pBlue = [];
+    if (isBalanced) {
+      const blueCountPerTier = playerCount === 3 ? 2 : 1;
+      for (let i = 0; i < blueCountPerTier; i++) {
+        if (t1.length > 0) pBlue.push(t1.pop());
+        if (t2.length > 0) pBlue.push(t2.pop());
+        if (t3.length > 0) pBlue.push(t3.pop());
+      }
+    } else {
+      const blueLimit = playerCount === 3 ? 6 : 3;
+      for (let i = 0; i < blueLimit; i++) {
+        if (bluePool.length > 0) pBlue.push(bluePool.pop());
+      }
+    }
+
+    const pRed = [];
+    for (let i = 0; i < 2; i++) {
+      if (redPool.length > 0) pRed.push(redPool.pop());
+    }
+
+    // Deal 2 random factions from the remaining post-ban pool
+    const pFactions = [shuffledDraftFactions[idx * 2], shuffledDraftFactions[idx * 2 + 1]].filter(Boolean);
+
+    // Initial 2 factions that the player saw during their ban phase
+    const banSeenFactions = (p.banPool || []).filter(fId => fId !== p.bannedFactionId);
+
+    // Draft Hand (what the player currently holds in their hand to choose from)
+    p.draftHand = {
+      tiles: [...pBlue, ...pRed],
+      factions: pFactions,
+    };
+
+    // Seen items accumulator (initially has the 2 factions from ban phase + 5 tiles & 2 factions dealt now)
+    const initialSeenFactions = Array.from(new Set([...banSeenFactions, ...pFactions]));
+    const initialSeenTiles = Array.from(new Set([...pBlue, ...pRed]));
+
+    p.seenItems = {
+      tiles: initialSeenTiles,
+      factions: initialSeenFactions,
+    };
+
+    // Picked items accumulator (items chosen by player so far during draft)
+    p.pickedItems = {
+      tiles: [],
+      factions: [],
+    };
+
+    // Number of draft picks completed
+    p.draftPicksCount = 0;
+  });
 }
 
 /**
@@ -382,6 +471,26 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('room_state', room);
   });
 
+  // DEV TOOLBAR: Auto-submit bans for other players (bots) to advance to drafting phase immediately
+  socket.on('dev_autoban_room', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.status !== 'faction_ban') return;
+
+    room.players.forEach(p => {
+      if (!p.hasBanned && p.banPool && p.banPool.length > 0) {
+        p.bannedFactionId = p.banPool[0];
+        p.hasBanned = true;
+      }
+    });
+
+    const allBanned = room.players.every(p => p.hasBanned);
+    if (allBanned) {
+      startDraftingPhase(room);
+    }
+
+    io.to(roomId).emit('room_state', room);
+  });
+
   socket.on('submit_faction_ban', ({ roomId, slotId, factionId }) => {
     const room = rooms.get(roomId);
     if (!room || room.status !== 'faction_ban') {
@@ -410,7 +519,7 @@ io.on('connection', (socket) => {
 
     const allBanned = room.players.every(p => p.hasBanned);
     if (allBanned) {
-      room.status = 'drafting';
+      startDraftingPhase(room);
     }
 
     io.to(roomId).emit('room_state', room);

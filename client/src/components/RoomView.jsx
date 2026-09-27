@@ -7,6 +7,7 @@ import DevToolbar from './DevToolbar.jsx';
 import PlayerHandPanel from './PlayerHandPanel.jsx';
 import TileZoomPreview from './TileZoomPreview.jsx';
 import FactionBanView from './FactionBanView.jsx';
+import DraftingPhaseView from './DraftingPhaseView.jsx';
 import { getPlayerForTurn, validatePlacement, getCurrentActiveRing, getActiveHexes, getSeatIndexForPlayer } from '../data/tileData.js';
 
 export default function RoomView() {
@@ -161,6 +162,7 @@ export default function RoomView() {
   const claimedCount = room.players.filter((p) => p.claimedBy !== null).length;
   const isLobby = room.status === 'lobby';
   const isFactionBan = room.status === 'faction_ban';
+  const isDrafting = room.status === 'drafting';
   const isCompleted = room.status === 'completed';
   const speaker = room.players.find((p) => p.isSpeaker);
 
@@ -257,6 +259,19 @@ export default function RoomView() {
           setBanningViewingSlotId={setBanningViewingSlotId}
           selectedBanFactionId={selectedBanFactionId}
           setSelectedBanFactionId={setSelectedBanFactionId}
+          socket={socket}
+          chipStyle={chipStyle}
+          copyBtnStyle={copyBtnStyle}
+          headerCardStyle={headerCardStyle}
+        />
+      ) : isDrafting ? (
+        <DraftingPhaseView
+          room={room}
+          userId={userId}
+          myClaimedSlot={myClaimedSlot}
+          totalSlots={totalSlots}
+          copied={copied}
+          copyRoomUrl={copyRoomUrl}
           socket={socket}
           chipStyle={chipStyle}
           copyBtnStyle={copyBtnStyle}
