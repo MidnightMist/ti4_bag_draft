@@ -27,5 +27,5 @@ jobs:
             
             # Перезапуск PM2 с именем процесса ti4_bag_draft
             pm2 delete ti4_bag_draft || true
-            pm2 start server/index.js --name "ti4_bag_draft"
+            PORT=4000 pm2 start server/index.js --name "ti4_bag_draft" --update-env
             pm2 save

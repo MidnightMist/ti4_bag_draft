@@ -559,7 +559,7 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 
 // Serve static tile images from client/public/tiles or root /tiles
 const clientTiles = path.resolve(__dirname, '../client/public/tiles');
