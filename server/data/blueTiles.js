@@ -1,2 +1,1 @@
-// Backwards compatibility re-export
-export * from './tileData.js';
+export * from '../../client/src/data/blueTiles.js';

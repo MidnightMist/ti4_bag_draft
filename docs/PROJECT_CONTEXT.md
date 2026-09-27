@@ -10,6 +10,10 @@
 ### Stack
 - **Frontend:** React 18, Vite, React Router v6, Tailwind CSS & inline component styles.
 - **Backend:** Node.js, Express, Socket.IO for real-time room synchronization.
+- **Shared Data & Architecture:**
+  - `client/src/data/` serves as the authoritative single source of truth for tile catalogs (`tileData.js`), factions (`factionsData.js`), and tier validation (`tierValidator.js`).
+  - `server/data/` re-exports directly from `client/src/data/` ensuring 100% synchronization between client and server with zero logic duplication.
+  - `TierConfigEditor.jsx` encapsulates the 3-tier blue tile balance configuration shared across both Random Map and Bag Draft setups.
 - **Persistence / State Management:**
   - In-memory `rooms` map on the server with full Socket.IO event broadcasting (`join_room`, `claim_slot`, `unclaim_slot`, `room_state`, `room_error`).
   - Client user identity using persistent `localStorage` UUID (`getOrCreateUserId`) so players can claim their slots from separate devices or refresh their browser without losing their slot.

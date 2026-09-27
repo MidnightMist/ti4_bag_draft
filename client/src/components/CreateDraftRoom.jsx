@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  getDefaultTiersForExpansions
-} from '../data/blueTiles.js';
+import { getDefaultTiersForExpansions } from '../data/blueTiles.js';
 import { validateBlueTiers } from '../data/tierValidator.js';
 import { FACTIONS, getActiveFactions } from '../data/factionsData.js';
+import TierConfigEditor from './TierConfigEditor.jsx';
 
 export default function CreateDraftRoom({ onCancel }) {
   const navigate = useNavigate();
@@ -353,118 +352,15 @@ export default function CreateDraftRoom({ onCancel }) {
       </div>
 
       {/* Tier configuration */}
-      <div style={sectionStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <label style={labelStyle}>Tile Balance Configuration:</label>
-          <button
-            id="toggle-balance-tiers-btn"
-            type="button"
-            onClick={() => setShowTierConfig(!showTierConfig)}
-            style={{
-              backgroundColor: 'transparent',
-              color: '#60a5fa',
-              border: '1px solid #3b82f6',
-              borderRadius: '6px',
-              padding: '6px 12px',
-              cursor: 'pointer',
-              fontSize: '14px',
-            }}
-          >
-            {showTierConfig ? 'Hide Tier Breakdown' : 'Customize 3 Tiers'}
-          </button>
-        </div>
-
-        {showTierConfig && (
-          <div style={tierModalContentStyle}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <p style={{ margin: 0, fontSize: '14px', color: '#9ca3af' }}>
-                Enter tile numbers separated by commas for each of the three tiers:
-              </p>
-              <button
-                id="reset-default-tiers-btn"
-                type="button"
-                onClick={handleResetTiers}
-                style={{
-                  backgroundColor: '#1f2937',
-                  color: '#93c5fd',
-                  border: '1px solid #4b5563',
-                  borderRadius: '4px',
-                  padding: '4px 10px',
-                  cursor: 'pointer',
-                  fontSize: '12px',
-                  whiteSpace: 'nowrap'
-                }}
-                title="Reset to default distribution for selected expansions"
-              >
-                Reset to Default
-              </button>
-            </div>
-
-            {tierError && (
-              <div
-                id="tier-validation-error-msg"
-                style={{
-                  backgroundColor: '#7f1d1d',
-                  color: '#fecaca',
-                  padding: '10px 14px',
-                  borderRadius: '6px',
-                  marginBottom: '14px',
-                  fontSize: '13px',
-                  lineHeight: '1.4',
-                  border: '1px solid #ef4444'
-                }}
-              >
-                ⚠️ <strong>Tile Distribution Error:</strong> {tierError}
-              </div>
-            )}
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div>
-                <span style={{ fontSize: '13px', color: '#93c5fd', fontWeight: 600 }}>Tier 1 (High):</span>
-                <input
-                  id="tier1-input"
-                  type="text"
-                  value={tiers.tier1}
-                  onChange={(e) => {
-                    setTiers({ ...tiers, tier1: e.target.value });
-                    if (tierError) setTierError(null);
-                  }}
-                  style={{ ...inputStyle, width: '100%', marginTop: '4px' }}
-                  placeholder="e.g. 27, 28, 29, 30..."
-                />
-              </div>
-              <div>
-                <span style={{ fontSize: '13px', color: '#93c5fd', fontWeight: 600 }}>Tier 2 (Medium):</span>
-                <input
-                  id="tier2-input"
-                  type="text"
-                  value={tiers.tier2}
-                  onChange={(e) => {
-                    setTiers({ ...tiers, tier2: e.target.value });
-                    if (tierError) setTierError(null);
-                  }}
-                  style={{ ...inputStyle, width: '100%', marginTop: '4px' }}
-                  placeholder="e.g. 26, 31, 33, 34..."
-                />
-              </div>
-              <div>
-                <span style={{ fontSize: '13px', color: '#93c5fd', fontWeight: 600 }}>Tier 3 (Base):</span>
-                <input
-                  id="tier3-input"
-                  type="text"
-                  value={tiers.tier3}
-                  onChange={(e) => {
-                    setTiers({ ...tiers, tier3: e.target.value });
-                    if (tierError) setTierError(null);
-                  }}
-                  style={{ ...inputStyle, width: '100%', marginTop: '4px' }}
-                  placeholder="e.g. 19, 20, 21, 22..."
-                />
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+      <TierConfigEditor
+        tiers={tiers}
+        setTiers={setTiers}
+        tierError={tierError}
+        setTierError={setTierError}
+        showTierConfig={showTierConfig}
+        setShowTierConfig={setShowTierConfig}
+        onResetTiers={handleResetTiers}
+      />
 
       {/* Action buttons */}
       <div style={{ display: 'flex', gap: '16px', marginTop: '32px' }}>
@@ -551,14 +447,6 @@ const smallActionBtnStyle = {
   padding: '4px 10px',
   cursor: 'pointer',
   fontSize: '12px',
-};
-
-const tierModalContentStyle = {
-  marginTop: '12px',
-  padding: '16px',
-  backgroundColor: '#161622',
-  borderRadius: '8px',
-  border: '1px solid #2f2f45',
 };
 
 const primaryBtnStyle = {

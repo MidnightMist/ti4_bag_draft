@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react-router-dom';
 import CreateRoom from './components/CreateRoom.jsx';
 import RoomView from './components/RoomView.jsx';
-import DraftPanel from './components/DraftPanel.jsx';
+import CreateDraftRoom from './components/CreateDraftRoom.jsx';
 
 function Home() {
   return (
@@ -112,7 +112,7 @@ export default function App() {
           path="/draft" 
           element={
             <PageLayout title="Bag Draft">
-              <DraftPanel />
+              <CreateDraftRoom />
             </PageLayout>
           } 
         />

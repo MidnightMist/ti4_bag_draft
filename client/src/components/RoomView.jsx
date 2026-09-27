@@ -6,8 +6,8 @@ import MapGrid from './MapGrid.jsx';
 import DevToolbar from './DevToolbar.jsx';
 import PlayerHandPanel from './PlayerHandPanel.jsx';
 import TileZoomPreview from './TileZoomPreview.jsx';
-import { getPlayerForTurn, validatePlacement, getCurrentActiveRing, ALL_37_HEXES, getActiveHexes, getSeatIndexForPlayer } from '../data/tileData.js';
-import { FACTIONS } from '../data/factionsData.js';
+import FactionBanView from './FactionBanView.jsx';
+import { getPlayerForTurn, validatePlacement, getCurrentActiveRing, getActiveHexes, getSeatIndexForPlayer } from '../data/tileData.js';
 
 export default function RoomView() {
   const { roomId } = useParams();
@@ -54,7 +54,6 @@ export default function RoomView() {
 
   // Initialize socket and load room
   useEffect(() => {
-    // 1. Initial REST fetch for fast load
     fetch(`/api/rooms/${roomId}`)
       .then(async (res) => {
         if (!res.ok) {
@@ -76,7 +75,6 @@ export default function RoomView() {
         setLoading(false);
       });
 
-    // 2. Connect Socket.IO
     const newSocket = io({
       transports: ['websocket', 'polling'],
     });
@@ -201,10 +199,7 @@ export default function RoomView() {
     setActionError(null);
     setSlotDrafts((prev) => ({
       ...prev,
-      [currentSlotId]: {
-        selectedTileId: tileId,
-        pendingHexId: null,
-      }
+      [currentSlotId]: { selectedTileId: tileId, pendingHexId: null }
     }));
   };
 
@@ -213,10 +208,7 @@ export default function RoomView() {
     setActionError(null);
     setSlotDrafts((prev) => ({
       ...prev,
-      [currentSlotId]: {
-        selectedTileId,
-        pendingHexId: hexId,
-      }
+      [currentSlotId]: { selectedTileId, pendingHexId: hexId }
     }));
   };
 
@@ -237,7 +229,6 @@ export default function RoomView() {
       tileId: selectedTileId,
       hexId: pendingHexId
     });
-    // Reset selection locally upon sending
     setSlotDrafts((prev) => ({
       ...prev,
       [myClaimedSlot.slotId]: { selectedTileId: null, pendingHexId: null }
@@ -250,236 +241,30 @@ export default function RoomView() {
       <DevToolbar
         room={room}
         currentUserId={userId}
-        onSwitchUser={handleSwitchUser}
         socket={socket}
+        onSwitchUser={handleSwitchUser}
       />
 
       {isFactionBan ? (
-        /* FACTION BAN PHASE VIEW */
-        <div id="faction-ban-container" style={{ maxWidth: '900px', margin: '0 auto' }}>
-          {/* Top Banner */}
-          <div style={headerCardStyle}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-              <div>
-                <span style={{ fontSize: '13px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  Bag Draft — Faction Banning Phase
-                </span>
-                <h2 style={{ margin: '4px 0 0 0', fontSize: '22px', color: '#f9fafb' }}>
-                  Room ID: <span style={{ color: '#60a5fa', fontFamily: 'monospace' }}>{room.id}</span>
-                </h2>
-              </div>
-              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-                <button
-                  id="copy-invite-link-btn"
-                  onClick={copyRoomUrl}
-                  style={copyBtnStyle(copied)}
-                >
-                  {copied ? '✓ Link Copied!' : '🔗 Copy Link for Players'}
-                </button>
-              </div>
-            </div>
-
-            <div style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
-              <span style={chipStyle}>👥 Players: {totalSlots}</span>
-              <span style={chipStyle}>⚖️ Balanced Tiles</span>
-              {room.settings.expansions.pok && <span style={chipStyle}>📦 PoK</span>}
-              {room.settings.expansions.thundersEdge && <span style={chipStyle}>⚡ Thunder's Edge</span>}
-              <span style={{ ...chipStyle, backgroundColor: '#9a3412', color: '#fed7aa' }}>
-                🚫 Step 1: Faction Banning
-              </span>
-            </div>
-          </div>
-
-          {/* Player Switcher Tabs for Banning */}
-          <div style={{ margin: '24px 0 16px 0' }}>
-            <div style={{ fontSize: '14px', color: '#9ca3af', marginBottom: '8px' }}>
-              Viewing / Managing Faction Ban for:
-            </div>
-            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-              {room.players.map(p => {
-                const isMe = Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId;
-                const activeSlotId = banningViewingSlotId !== null ? banningViewingSlotId : (myClaimedSlot ? myClaimedSlot.slotId : room.players[0].slotId);
-                const isSelectedTab = activeSlotId === p.slotId;
-
-                return (
-                  <button
-                    key={p.slotId}
-                    onClick={() => {
-                      setBanningViewingSlotId(p.slotId);
-                      setSelectedBanFactionId(null);
-                    }}
-                    style={{
-                      padding: '8px 14px',
-                      backgroundColor: isSelectedTab ? '#2563eb' : '#1f2937',
-                      color: isSelectedTab ? '#fff' : '#d1d5db',
-                      border: `1px solid ${isSelectedTab ? '#60a5fa' : '#374151'}`,
-                      borderRadius: '6px',
-                      cursor: 'pointer',
-                      fontSize: '13px',
-                      fontWeight: isSelectedTab ? 'bold' : 'normal',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                    }}
-                  >
-                    <span>{p.name}</span>
-                    {isMe && <span style={{ fontSize: '10px', backgroundColor: '#1e3a8a', padding: '1px 4px', borderRadius: '3px' }}>YOU</span>}
-                    {p.hasBanned ? <span style={{ color: '#34d399' }}>✓</span> : <span style={{ color: '#fbbf24' }}>⏳</span>}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Active Player Ban Card / Interface */}
-          {(() => {
-            const activeSlotId = banningViewingSlotId !== null ? banningViewingSlotId : (myClaimedSlot ? myClaimedSlot.slotId : room.players[0].slotId);
-            const activePlayer = room.players.find(p => p.slotId === activeSlotId) || room.players[0];
-
-            return (
-              <div style={{ backgroundColor: '#171724', border: '1px solid #28283c', borderRadius: '12px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.4)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                  <h3 style={{ margin: 0, fontSize: '18px', color: '#f9fafb' }}>
-                    {activePlayer.name}'s Faction Ban Selection
-                  </h3>
-                  <span style={{
-                    fontSize: '13px',
-                    padding: '4px 10px',
-                    borderRadius: '6px',
-                    backgroundColor: activePlayer.hasBanned ? '#064e3b' : '#78350f',
-                    color: activePlayer.hasBanned ? '#34d399' : '#fde68a',
-                    fontWeight: 'bold',
-                  }}>
-                    {activePlayer.hasBanned ? '✓ Ban Submitted' : '⏳ Action Required: Choose 1 to Ban'}
-                  </span>
-                </div>
-
-                {activePlayer.hasBanned ? (
-                  <div style={{ textAlign: 'center', padding: '32px 0' }}>
-                    <div style={{ fontSize: '16px', color: '#34d399', marginBottom: '16px' }}>
-                      Player <strong>{activePlayer.name}</strong> has successfully banned:
-                    </div>
-                    {(() => {
-                      const bannedFaction = FACTIONS.find(f => f.id === activePlayer.bannedFactionId);
-                      if (!bannedFaction) return <div style={{ color: '#fff' }}>{activePlayer.bannedFactionId}</div>;
-                      return (
-                        <div style={{ display: 'inline-block', backgroundColor: '#1e1e2d', border: '2px solid #ef4444', borderRadius: '12px', padding: '16px' }}>
-                          <img
-                            src={`/factions/${encodeURIComponent(bannedFaction.filename)}`}
-                            alt={bannedFaction.name}
-                            style={{ width: '140px', height: '140px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #3f3f5a', marginBottom: '10px' }}
-                          />
-                          <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#fca5a5', textDecoration: 'line-through' }}>
-                            {bannedFaction.name} (Banned)
-                          </div>
-                        </div>
-                      );
-                    })()}
-                  </div>
-                ) : (
-                  <div>
-                    <p style={{ color: '#9ca3af', fontSize: '14px', marginTop: 0, marginBottom: '20px' }}>
-                      Click on one of the 3 randomly assigned factions below, then click the confirmation button to ban it from the draft pool.
-                    </p>
-
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                      {(activePlayer.banPool || []).map(factionId => {
-                        const faction = FACTIONS.find(f => f.id === factionId);
-                        if (!faction) return null;
-                        const isSelected = selectedBanFactionId === factionId;
-
-                        return (
-                          <div
-                            key={factionId}
-                            onClick={() => setSelectedBanFactionId(factionId)}
-                            style={{
-                              backgroundColor: isSelected ? '#1e3a8a' : '#14141f',
-                              border: `2px solid ${isSelected ? '#3b82f6' : '#2f2f45'}`,
-                              borderRadius: '10px',
-                              padding: '16px',
-                              cursor: 'pointer',
-                              textAlign: 'center',
-                              boxShadow: isSelected ? '0 0 16px rgba(59, 130, 246, 0.4)' : 'none',
-                              transition: 'all 0.15s ease',
-                            }}
-                          >
-                            <img
-                              src={`/factions/${encodeURIComponent(faction.filename)}`}
-                              alt={faction.name}
-                              style={{ width: '120px', height: '120px', objectFit: 'cover', borderRadius: '8px', border: '1px solid #3f3f5a', marginBottom: '12px' }}
-                            />
-                            <div style={{ fontSize: '15px', fontWeight: 'bold', color: '#f3f4f6' }}>
-                              {faction.name}
-                            </div>
-                            <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '4px' }}>
-                              {faction.expansion === 'pok' ? 'Prophecy of Kings' : faction.expansion === 'thundersEdge' ? "Thunder's Edge" : 'Base Game'}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    <div style={{ marginTop: '24px', textAlign: 'center' }}>
-                      <button
-                        onClick={() => {
-                          if (!socket || !selectedBanFactionId) return;
-                          socket.emit('submit_faction_ban', {
-                            roomId: room.id,
-                            slotId: activePlayer.slotId,
-                            factionId: selectedBanFactionId
-                          });
-                          setSelectedBanFactionId(null);
-                        }}
-                        disabled={!selectedBanFactionId}
-                        style={{
-                          padding: '12px 32px',
-                          fontSize: '16px',
-                          fontWeight: 'bold',
-                          backgroundColor: selectedBanFactionId ? '#dc2626' : '#374151',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: '8px',
-                          cursor: selectedBanFactionId ? 'pointer' : 'not-allowed',
-                          boxShadow: selectedBanFactionId ? '0 4px 14px rgba(220, 38, 38, 0.4)' : 'none',
-                        }}
-                      >
-                        {selectedBanFactionId ? `Confirm Ban: ${FACTIONS.find(f => f.id === selectedBanFactionId)?.name}` : 'Select a Faction to Ban'}
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-
-          {/* All Players Ban Summary Checklist */}
-          <div style={{ marginTop: '24px', backgroundColor: '#171724', border: '1px solid #28283c', borderRadius: '12px', padding: '20px' }}>
-            <h4 style={{ margin: '0 0 12px 0', fontSize: '15px', color: '#f3f4f6' }}>
-              Players Banning Progress
-            </h4>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '10px' }}>
-              {room.players.map(p => {
-                const bannedFaction = FACTIONS.find(f => f.id === p.bannedFactionId);
-                return (
-                  <div key={p.slotId} style={{ backgroundColor: '#12121a', border: '1px solid #272738', borderRadius: '8px', padding: '10px 12px' }}>
-                    <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#e5e7eb' }}>{p.name}</div>
-                    <div style={{ fontSize: '12px', marginTop: '4px' }}>
-                      {p.hasBanned ? (
-                        <span style={{ color: '#34d399' }}>✓ Banned {bannedFaction?.name || 'Faction'}</span>
-                      ) : (
-                        <span style={{ color: '#fbbf24' }}>⏳ Choosing ban...</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
+        <FactionBanView
+          room={room}
+          userId={userId}
+          myClaimedSlot={myClaimedSlot}
+          totalSlots={totalSlots}
+          copied={copied}
+          copyRoomUrl={copyRoomUrl}
+          banningViewingSlotId={banningViewingSlotId}
+          setBanningViewingSlotId={setBanningViewingSlotId}
+          selectedBanFactionId={selectedBanFactionId}
+          setSelectedBanFactionId={setSelectedBanFactionId}
+          socket={socket}
+          chipStyle={chipStyle}
+          copyBtnStyle={copyBtnStyle}
+          headerCardStyle={headerCardStyle}
+        />
       ) : isLobby ? (
         /* LOBBY VIEW */
         <>
-          {/* Top Banner with share link and status */}
           <div style={headerCardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
               <div>
@@ -490,7 +275,6 @@ export default function RoomView() {
                   ID: <span style={{ color: '#60a5fa', fontFamily: 'monospace' }}>{room.id}</span>
                 </h2>
               </div>
-
               <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
                 <button
                   id="copy-invite-link-btn"
@@ -502,7 +286,6 @@ export default function RoomView() {
               </div>
             </div>
 
-            {/* Room configuration info chips */}
             <div style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
               <span style={chipStyle}>👥 Players: {totalSlots}</span>
               <span style={chipStyle}>
@@ -510,17 +293,12 @@ export default function RoomView() {
               </span>
               {room.settings.expansions.pok && <span style={chipStyle}>📦 PoK</span>}
               {room.settings.expansions.thundersEdge && <span style={chipStyle}>⚡ Thunder's Edge</span>}
-              <span style={{
-                ...chipStyle,
-                backgroundColor: '#374151',
-                color: '#f3f4f6'
-              }}>
+              <span style={{ ...chipStyle, backgroundColor: '#374151', color: '#f3f4f6' }}>
                 {`⏳ Waiting for Claims (${claimedCount}/${totalSlots})`}
               </span>
             </div>
           </div>
 
-          {/* Lobby Claim Slots Grid */}
           <div id="lobby-claim-section" style={{ marginTop: '24px' }}>
             <div style={{ textAlign: 'center', marginBottom: '24px' }}>
               <h3 style={{ fontSize: '20px', color: '#f3f4f6', margin: '0 0 8px 0' }}>
@@ -622,671 +400,506 @@ export default function RoomView() {
             </div>
           </div>
         </>
-      ) : isCompleted ? (
-        /* COMPLETED MAP VIEW:
-           Full-screen spacious galaxy layout.
-           Left sidebar with "Map Creation Room" card (permalink button) and "Rotate Perspective" controls.
-           Right main column with expanded high-resolution map without mini badges.
-        */
-        <div id="completed-map-container" style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          {/* Left Sidebar: Room info + Perspective Rotation controls */}
+      ) : (
+        /* UNIFIED MAP VIEW (Active Draft or Completed) */
+        <div
+          id={isCompleted ? 'completed-map-container' : 'map-building-container'}
+          style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}
+        >
+          {/* SIDEBAR */}
           <aside
-            id="completed-map-sidebar"
+            id={isCompleted ? 'completed-map-sidebar' : 'room-side-panel'}
             style={{
-              width: '320px',
+              width: isCompleted ? '320px' : '310px',
               flexShrink: 0,
               display: 'flex',
               flexDirection: 'column',
-              gap: '16px',
+              gap: isCompleted ? '16px' : '14px',
             }}
           >
-            {/* Block 1: Map Creation Room Card with shareable link */}
-            <div
-              id="completed-room-header"
-              style={{
-                backgroundColor: '#171724',
-                border: '1px solid #28283c',
-                borderRadius: '14px',
-                padding: '18px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>
-                  Map Creation Room
-                </span>
-                <span style={{ fontSize: '11px', color: '#34d399', backgroundColor: '#064e3b', padding: '3px 8px', borderRadius: '4px', fontWeight: '700' }}>
-                  ✓ Completed
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#f3f4f6', fontFamily: 'monospace' }}>
-                  ID: <span style={{ color: '#60a5fa' }}>{room.id}</span>
-                </span>
-              </div>
-
-              {/* Direct Permalink Button leading to this completed map */}
-              <div style={{ marginTop: '14px' }}>
-                <button
-                  id="copy-map-link-btn"
-                  onClick={copyRoomUrl}
-                  style={{
-                    width: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    padding: '11px 16px',
-                    backgroundColor: copied ? '#059669' : '#2563eb',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontSize: '13px',
-                    fontWeight: '700',
-                    boxShadow: '0 2px 10px rgba(37, 99, 235, 0.35)',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {copied ? '✓ Link Copied!' : '🔗 Copy Map Link'}
-                </button>
-                <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '6px', textAlign: 'center' }}>
-                  Share this permalink to view the completed galaxy
-                </div>
-              </div>
-
-              {/* Badges */}
-              <div style={{ display: 'flex', gap: '6px', marginTop: '14px', flexWrap: 'wrap' }}>
-                <span style={miniChipStyle}>👥 {totalSlots} Players</span>
-                <span style={miniChipStyle}>
-                  {room.settings.tileMode === 'balanced' ? '⚖️ Balanced' : '🎲 Random'}
-                </span>
-                {room.settings.expansions.pok && <span style={miniChipStyle}>📦 PoK</span>}
-                {room.settings.expansions.thundersEdge && <span style={miniChipStyle}>⚡ Thunder's Edge</span>}
-                <span style={{ ...miniChipStyle, backgroundColor: '#064e3b', color: '#a7f3d0' }}>
-                  🌌 37 Systems
-                </span>
-              </div>
-            </div>
-
-            {/* Block 2: Tile Numbers Display Toggle Checkbox */}
-            <div
-              id="display-options-card"
-              style={{
-                backgroundColor: '#171724',
-                border: '1px solid #28283c',
-                borderRadius: '14px',
-                padding: '14px 18px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-              }}
-            >
-              <label
-                htmlFor="toggle-tile-numbers-checkbox"
+            {isCompleted ? (
+              /* Block 1: Completed Header */
+              <div
+                id="completed-room-header"
                 style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  cursor: 'pointer',
-                  userSelect: 'none',
+                  backgroundColor: '#171724',
+                  border: '1px solid #28283c',
+                  borderRadius: '14px',
+                  padding: '18px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <span style={{ fontSize: '18px' }}>🔢</span>
-                  <div>
-                    <div style={{ fontSize: '13px', fontWeight: '700', color: '#f3f4f6' }}>
-                      Show Tile Numbers
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>
+                    Map Creation Room
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#34d399', backgroundColor: '#064e3b', padding: '3px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                    ✓ Completed
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '10px' }}>
+                  <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#f3f4f6', fontFamily: 'monospace' }}>
+                    ID: <span style={{ color: '#60a5fa' }}>{room.id}</span>
+                  </span>
+                </div>
+
+                <div style={{ marginTop: '14px' }}>
+                  <button
+                    id="copy-map-link-btn"
+                    onClick={copyRoomUrl}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      padding: '11px 16px',
+                      backgroundColor: copied ? '#059669' : '#2563eb',
+                      color: '#fff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '13px',
+                      fontWeight: '700',
+                      boxShadow: '0 2px 10px rgba(37, 99, 235, 0.35)',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {copied ? '✓ Link Copied!' : '🔗 Copy Map Link'}
+                  </button>
+                  <div style={{ fontSize: '11px', color: '#9ca3af', marginTop: '6px', textAlign: 'center' }}>
+                    Share this permalink to view the completed galaxy
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '6px', marginTop: '14px', flexWrap: 'wrap' }}>
+                  <span style={miniChipStyle}>👥 {totalSlots} Players</span>
+                  <span style={miniChipStyle}>
+                    {room.settings.tileMode === 'balanced' ? '⚖️ Balanced' : '🎲 Random'}
+                  </span>
+                  {room.settings.expansions.pok && <span style={miniChipStyle}>📦 PoK</span>}
+                  {room.settings.expansions.thundersEdge && <span style={miniChipStyle}>⚡ Thunder's Edge</span>}
+                  <span style={{ ...miniChipStyle, backgroundColor: '#064e3b', color: '#a7f3d0' }}>
+                    🌌 {activeHexes.length} Systems
+                  </span>
+                </div>
+              </div>
+            ) : (
+              /* Block 1: Compact Active Room Header */
+              <div
+                id="compact-room-header"
+                style={{
+                  backgroundColor: '#171724',
+                  border: '1px solid #28283c',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>
+                    Map Creation Room
+                  </span>
+                  <span style={{ fontSize: '11px', color: '#34d399', backgroundColor: '#064e3b', padding: '2px 7px', borderRadius: '4px', fontWeight: '600' }}>
+                    Active Draft
+                  </span>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
+                  <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#f3f4f6', fontFamily: 'monospace' }}>
+                    ID: <span style={{ color: '#60a5fa' }}>{room.id}</span>
+                  </span>
+                  <button
+                    id="compact-copy-btn"
+                    onClick={copyRoomUrl}
+                    style={{
+                      backgroundColor: copied ? '#059669' : '#1e3a8a',
+                      color: '#fff',
+                      border: '1px solid #3b82f6',
+                      borderRadius: '6px',
+                      padding: '4px 10px',
+                      fontSize: '11px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {copied ? '✓ Copied' : '🔗 Link'}
+                  </button>
+                </div>
+
+                <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+                  <span style={miniChipStyle}>👥 {totalSlots} Players</span>
+                  <span style={miniChipStyle}>
+                    {room.settings.tileMode === 'balanced' ? '⚖️ Balanced' : '🎲 Random'}
+                  </span>
+                  {room.settings.expansions.pok && <span style={miniChipStyle}>📦 PoK</span>}
+                  {room.settings.expansions.thundersEdge && <span style={miniChipStyle}>⚡ Thunder's Edge</span>}
+                </div>
+              </div>
+            )}
+
+            {/* Block 2: Tile Numbers Checkbox (Completed) or Status Card (Active) */}
+            {isCompleted ? (
+              <div
+                id="display-options-card"
+                style={{
+                  backgroundColor: '#171724',
+                  border: '1px solid #28283c',
+                  borderRadius: '14px',
+                  padding: '14px 18px',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                }}
+              >
+                <label
+                  htmlFor="toggle-tile-numbers-checkbox"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '18px' }}>🔢</span>
+                    <div>
+                      <div style={{ fontSize: '13px', fontWeight: '700', color: '#f3f4f6' }}>
+                        Show Tile Numbers
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#9ca3af' }}>
+                        Display system numbers on board tiles
+                      </div>
                     </div>
-                    <div style={{ fontSize: '11px', color: '#9ca3af' }}>
-                      Overlay system numbers on tiles
+                  </div>
+                  <input
+                    id="toggle-tile-numbers-checkbox"
+                    type="checkbox"
+                    checked={showTileNumbers}
+                    onChange={(e) => setShowTileNumbers(e.target.checked)}
+                    style={{
+                      width: '18px',
+                      height: '18px',
+                      accentColor: '#2563eb',
+                      cursor: 'pointer',
+                    }}
+                  />
+                </label>
+              </div>
+            ) : (
+              <div
+                id="compact-status-card"
+                style={{
+                  backgroundColor: 'rgba(6, 78, 59, 0.4)',
+                  border: '1px solid #059669',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '18px' }}>🚀</span>
+                  <div>
+                    <div style={{ color: '#34d399', fontWeight: '700', fontSize: '13px' }}>
+                      All players claimed their slots!
+                    </div>
+                    <div style={{ color: '#d1fae5', fontSize: '12px', marginTop: '2px' }}>
+                      Speaker: <strong style={{ color: '#fbbf24' }}>👑 {speaker?.name || 'Player 1'}</strong>
+                    </div>
+                    <div style={{ color: '#fbbf24', fontSize: '12px', marginTop: '4px' }}>
+                      Turn: <strong>{currentTurnPlayer?.name || 'Player 1'}</strong> {isMyTurn ? '(Your Turn!)' : ''}
                     </div>
                   </div>
                 </div>
-                <input
-                  type="checkbox"
-                  id="toggle-tile-numbers-checkbox"
-                  checked={showTileNumbers}
-                  onChange={(e) => setShowTileNumbers(e.target.checked)}
-                  style={{
-                    width: '18px',
-                    height: '18px',
-                    accentColor: '#2563eb',
-                    cursor: 'pointer',
-                  }}
-                />
-              </label>
-            </div>
+              </div>
+            )}
 
-            {/* Block 3: Perspective / Rotate View Interface */}
-            <div
-              id="perspective-selector-card"
-              style={{
-                backgroundColor: '#171724',
-                border: '1px solid #28283c',
-                borderRadius: '14px',
-                padding: '18px',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ fontSize: '15px' }}>🧭</span>
-                  <span style={{ fontSize: '12px', color: '#f3f4f6', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    Map Perspective
-                  </span>
+            {/* Block 3: Perspective Selector & Seating Order */}
+            {isCompleted ? (
+              <div
+                id="perspective-selector-card"
+                style={{
+                  backgroundColor: '#171724',
+                  border: '1px solid #28283c',
+                  borderRadius: '14px',
+                  padding: '18px',
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '15px' }}>🧭</span>
+                    <span style={{ fontSize: '12px', color: '#f3f4f6', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Map Perspective
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '11px', color: '#9ca3af' }}>Rotate View</span>
                 </div>
-                <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                  Rotate View
-                </span>
-              </div>
 
-              <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px', lineHeight: '1.4' }}>
-                Choose a player to view the galaxy from their seat (their home system rotates to the bottom):
-              </div>
+                <div style={{ fontSize: '12px', color: '#9ca3af', marginBottom: '12px', lineHeight: '1.4' }}>
+                  Choose a player to view the galaxy from their seat (their home system rotates to the bottom):
+                </div>
 
-              {/* Player Perspective Buttons */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {(totalSlots === 5 || totalSlots === 4) && (
-                  <button
-                    id="perspective-btn-overview"
-                    onClick={() => setSelectedPerspectiveSeat(0)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      padding: '10px 12px',
-                      backgroundColor: activePerspectiveSeat === 0 ? '#064e3b' : '#1f1f2e',
-                      border: activePerspectiveSeat === 0 ? '1.5px solid #10b981' : '1px solid #2f2f45',
-                      borderRadius: '8px',
-                      cursor: 'pointer',
-                      color: activePerspectiveSeat === 0 ? '#ecfdf5' : '#d1d5db',
-                      fontWeight: activePerspectiveSeat === 0 ? '700' : '500',
-                      fontSize: '13px',
-                      transition: 'all 0.15s ease',
-                      boxShadow: activePerspectiveSeat === 0 ? '0 0 12px rgba(16, 185, 129, 0.35)' : 'none',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span>🌌</span>
-                      <span>{totalSlots === 4 ? 'Overview (Hyperlanes South/North)' : 'Overview (Hyperlanes South)'}</span>
-                    </div>
-                    {activePerspectiveSeat === 0 ? (
-                      <span style={{ fontSize: '11px', color: '#6ee7b7', fontWeight: 'bold' }}>✓ Active</span>
-                    ) : (
-                      <span style={{ fontSize: '11px', color: '#6b7280' }}>View ↷</span>
-                    )}
-                  </button>
-                )}
-
-                {room.players.map((player, playerIdx) => {
-                  const targetSeat = (totalSlots === 8 || totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3) ? getSeatIndexForPlayer(playerIdx, totalSlots) : playerIdx;
-                  const isOriented = activePerspectiveSeat === targetSeat;
-                  const isViewer = myClaimedSlot && myClaimedSlot.slotId === player.slotId;
-
-                  return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {(totalSlots === 5 || totalSlots === 4) && (
                     <button
-                      key={player.slotId ?? playerIdx}
-                      id={`perspective-btn-${playerIdx}`}
-                      onClick={() => setSelectedPerspectiveSeat(targetSeat)}
+                      id="perspective-btn-overview"
+                      onClick={() => setSelectedPerspectiveSeat(0)}
                       style={{
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'space-between',
                         padding: '10px 12px',
-                        backgroundColor: isOriented ? '#064e3b' : '#1f1f2e',
-                        border: isOriented ? '1.5px solid #10b981' : '1px solid #2f2f45',
+                        backgroundColor: activePerspectiveSeat === 0 ? '#064e3b' : '#1f1f2e',
+                        border: activePerspectiveSeat === 0 ? '1.5px solid #10b981' : '1px solid #2f2f45',
                         borderRadius: '8px',
                         cursor: 'pointer',
-                        color: isOriented ? '#ecfdf5' : '#d1d5db',
-                        fontWeight: isOriented ? '700' : '500',
+                        color: activePerspectiveSeat === 0 ? '#ecfdf5' : '#d1d5db',
+                        fontWeight: activePerspectiveSeat === 0 ? '700' : '500',
                         fontSize: '13px',
-                        transition: 'all 0.15s ease',
-                        boxShadow: isOriented ? '0 0 12px rgba(16, 185, 129, 0.35)' : 'none',
                       }}
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ color: isOriented ? '#34d399' : '#6b7280', fontSize: '12px', fontFamily: 'monospace' }}>
-                          #{playerIdx + 1}
-                        </span>
-                        <span>{player.name}</span>
-                        {player.isSpeaker && <span title="Speaker">👑</span>}
-                        {isViewer && (
-                          <span style={{ fontSize: '9px', backgroundColor: '#2563eb', padding: '1px 5px', borderRadius: '4px', color: '#fff', fontWeight: 'bold' }}>
-                            YOU
-                          </span>
-                        )}
+                        <span>🌌</span>
+                        <span>{totalSlots === 4 ? 'Overview (Hyperlanes South/North)' : 'Overview (Hyperlanes South)'}</span>
                       </div>
-
-                      {isOriented ? (
-                        <span style={{ fontSize: '11px', color: '#6ee7b7', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '3px' }}>
-                          ✓ South
-                        </span>
+                      {activePerspectiveSeat === 0 ? (
+                        <span style={{ fontSize: '11px', color: '#6ee7b7', fontWeight: 'bold' }}>✓ Active</span>
                       ) : (
-                        <span style={{ fontSize: '11px', color: '#6b7280' }}>
-                          View ↷
-                        </span>
+                        <span style={{ fontSize: '11px', color: '#6b7280' }}>View ↷</span>
                       )}
                     </button>
-                  );
-                })}
-              </div>
+                  )}
 
-              {/* Step Rotation Row */}
-              <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
-                <button
-                  id="rotate-ccw-btn"
-                  onClick={() => setSelectedPerspectiveSeat((prev) => {
-                    const cur = prev !== null ? prev : activePerspectiveSeat;
-                    const seatMod = totalSlots || 6;
-                    return (cur - 1 + seatMod) % seatMod;
+                  {room.players.map((player, playerIdx) => {
+                    const targetSeat = (totalSlots === 8 || totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3)
+                      ? getSeatIndexForPlayer(playerIdx, totalSlots)
+                      : playerIdx;
+                    const isOriented = activePerspectiveSeat === targetSeat;
+                    const isViewer = myClaimedSlot && myClaimedSlot.slotId === player.slotId;
+
+                    return (
+                      <button
+                        key={player.slotId ?? playerIdx}
+                        id={`perspective-btn-${playerIdx}`}
+                        onClick={() => setSelectedPerspectiveSeat(targetSeat)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '10px 12px',
+                          backgroundColor: isOriented ? '#064e3b' : '#1f1f2e',
+                          border: isOriented ? '1.5px solid #10b981' : '1px solid #2f2f45',
+                          borderRadius: '8px',
+                          cursor: 'pointer',
+                          color: isOriented ? '#ecfdf5' : '#d1d5db',
+                          fontWeight: isOriented ? '700' : '500',
+                          fontSize: '13px',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span style={{ color: isOriented ? '#34d399' : '#6b7280', fontSize: '12px', fontFamily: 'monospace' }}>
+                            #{playerIdx + 1}
+                          </span>
+                          <span>{player.name}</span>
+                          {player.isSpeaker && <span title="Speaker">👑</span>}
+                          {isViewer && (
+                            <span style={{ fontSize: '9px', backgroundColor: '#2563eb', padding: '1px 5px', borderRadius: '4px', color: '#fff', fontWeight: 'bold' }}>
+                              YOU
+                            </span>
+                          )}
+                        </div>
+                        {isOriented ? (
+                          <span style={{ fontSize: '11px', color: '#6ee7b7', fontWeight: 'bold' }}>✓ South</span>
+                        ) : (
+                          <span style={{ fontSize: '11px', color: '#6b7280' }}>View ↷</span>
+                        )}
+                      </button>
+                    );
                   })}
-                  style={{
-                    flex: 1,
-                    padding: '8px 10px',
-                    backgroundColor: '#242436',
-                    border: '1px solid #374151',
-                    borderRadius: '6px',
-                    color: '#e5e7eb',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                  }}
-                  title="Rotate Counter-Clockwise"
-                >
-                  ↺ -60°
-                </button>
+                </div>
 
-                <button
-                  id="rotate-cw-btn"
-                  onClick={() => setSelectedPerspectiveSeat((prev) => {
-                    const cur = prev !== null ? prev : activePerspectiveSeat;
-                    const seatMod = totalSlots || 6;
-                    return (cur + 1) % seatMod;
-                  })}
-                  style={{
-                    flex: 1,
-                    padding: '8px 10px',
-                    backgroundColor: '#242436',
-                    border: '1px solid #374151',
-                    borderRadius: '6px',
-                    color: '#e5e7eb',
-                    fontSize: '12px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                  }}
-                  title="Rotate Clockwise"
-                >
-                  ↻ +60°
-                </button>
-
-                {myClaimedSlot && (
+                {/* Step Rotation Row */}
+                <div style={{ display: 'flex', gap: '8px', marginTop: '14px' }}>
                   <button
-                    id="rotate-reset-btn"
-                    onClick={() => {
-                      const myIdx = room.players.findIndex(p => p.slotId === myClaimedSlot.slotId);
-                      if (myIdx >= 0) {
-                        const targetSeat = (totalSlots === 8 || totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3) ? getSeatIndexForPlayer(myIdx, totalSlots) : myIdx;
-                        setSelectedPerspectiveSeat(targetSeat);
-                      }
-                    }}
-                    style={{
-                      padding: '8px 10px',
-                      backgroundColor: '#1e3a8a',
-                      border: '1px solid #3b82f6',
-                      borderRadius: '6px',
-                      color: '#bfdbfe',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                    }}
-                    title="Reset orientation to your seat"
+                    id="rotate-ccw-btn"
+                    onClick={() => setSelectedPerspectiveSeat((prev) => {
+                      const cur = prev !== null ? prev : activePerspectiveSeat;
+                      const seatMod = totalSlots || 6;
+                      return (cur - 1 + seatMod) % seatMod;
+                    })}
+                    style={{ flex: 1, padding: '8px 10px', backgroundColor: '#242436', border: '1px solid #374151', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
                   >
-                    My Seat
+                    ↺ -60°
                   </button>
-                )}
-              </div>
-            </div>
-
-            {/* Block 3: Map Summary Details */}
-            <div
-              id="completed-summary-card"
-              style={{
-                backgroundColor: '#171724',
-                border: '1px solid #28283c',
-                borderRadius: '14px',
-                padding: '16px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-              }}
-            >
-              <div style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700', marginBottom: '8px' }}>
-                Galaxy Details
-              </div>
-              <div style={{ fontSize: '13px', color: '#d1d5db', display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#9ca3af' }}>Speaker:</span>
-                  <strong style={{ color: '#fbbf24' }}>👑 {speaker?.name || 'Player 1'}</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#9ca3af' }}>Tiles Placed:</span>
-                  <strong style={{ color: '#34d399' }}>{Object.keys(room.mapState?.placedTiles || {}).length} tiles</strong>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: '#9ca3af' }}>Rings Completed:</span>
-                  <strong style={{ color: '#60a5fa' }}>3 / 3 Rings</strong>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          {/* MAIN COLUMN: Expansive Full Map */}
-          <main
-            id="completed-map-main"
-            style={{
-              flex: 1,
-              minWidth: '550px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-            }}
-          >
-            <MapGrid
-              room={room}
-              mySlot={myClaimedSlot}
-              selectedTileId={null}
-              pendingHexId={null}
-              isMyTurn={false}
-              onHoverTile={setHoveredTileId}
-              perspectiveSeatIndex={activePerspectiveSeat}
-              isCompleted={true}
-              showTileCounts={false}
-              showTileNumbers={showTileNumbers}
-              isFullscreen={isFullscreen}
-              onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
-            />
-          </main>
-        </div>
-      ) : (
-        /* ACTIVE MAP BUILDING VIEW:
-           Two-column layout shifting the two top blocks to a compact sidebar,
-           leaving the main center area spacious for the large hex board and player hand.
-        */
-        <div id="map-building-container" style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', alignItems: 'flex-start' }}>
-          {/* SIDEBAR: Compact Room Header + Claim Status + Seating Roster */}
-          <aside
-            id="room-side-panel"
-            style={{
-              width: '310px',
-              flexShrink: 0,
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '14px',
-            }}
-          >
-            {/* Block 1 (Reduced & shifted): Compact Map Creation Room Header */}
-            <div
-              id="compact-room-header"
-              style={{
-                backgroundColor: '#171724',
-                border: '1px solid #28283c',
-                borderRadius: '12px',
-                padding: '16px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700' }}>
-                  Map Creation Room
-                </span>
-                <span style={{ fontSize: '11px', color: '#34d399', backgroundColor: '#064e3b', padding: '2px 7px', borderRadius: '4px', fontWeight: '600' }}>
-                  Active Draft
-                </span>
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '8px' }}>
-                <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#f3f4f6', fontFamily: 'monospace' }}>
-                  ID: <span style={{ color: '#60a5fa' }}>{room.id}</span>
-                </span>
-                <button
-                  id="compact-copy-btn"
-                  onClick={copyRoomUrl}
-                  style={{
-                    backgroundColor: copied ? '#059669' : '#1e3a8a',
-                    color: '#fff',
-                    border: '1px solid #3b82f6',
-                    borderRadius: '6px',
-                    padding: '4px 10px',
-                    fontSize: '11px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.15s ease',
-                  }}
-                >
-                  {copied ? '✓ Copied' : '🔗 Link'}
-                </button>
-              </div>
-
-              {/* Badges */}
-              <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
-                <span style={miniChipStyle}>👥 {totalSlots} Players</span>
-                <span style={miniChipStyle}>
-                  {room.settings.tileMode === 'balanced' ? '⚖️ Balanced' : '🎲 Random'}
-                </span>
-                {room.settings.expansions.pok && <span style={miniChipStyle}>📦 PoK</span>}
-                {room.settings.expansions.thundersEdge && <span style={miniChipStyle}>⚡ Thunder's Edge</span>}
-              </div>
-            </div>
-
-            {/* Block 2 (Reduced & shifted): Compact Claim Status Alert */}
-            <div
-              id="compact-status-card"
-              style={{
-                backgroundColor: 'rgba(6, 78, 59, 0.4)',
-                border: '1px solid #059669',
-                borderRadius: '12px',
-                padding: '14px',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontSize: '18px' }}>🚀</span>
-                <div>
-                  <div style={{ color: '#34d399', fontWeight: '700', fontSize: '13px' }}>
-                    All players claimed their slots!
-                  </div>
-                  <div style={{ color: '#d1fae5', fontSize: '12px', marginTop: '2px' }}>
-                    Speaker: <strong style={{ color: '#fbbf24' }}>👑 {speaker?.name || 'Player 1'}</strong>
-                  </div>
-                  <div style={{ color: '#fbbf24', fontSize: '12px', marginTop: '4px' }}>
-                    Turn: <strong>{currentTurnPlayer?.name || 'Player 1'}</strong> {isMyTurn ? '(Your Turn!)' : ''}
-                  </div>
-                </div>
-              </div>
-
-              {myClaimedSlot && (
-                <div
-                  style={{
-                    marginTop: '10px',
-                    paddingTop: '10px',
-                    borderTop: '1px solid rgba(16, 185, 129, 0.25)',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                  }}
-                >
-                  <span style={{ fontSize: '12px', color: '#d1d5db' }}>
-                    You: <strong style={{ color: '#60a5fa' }}>{myClaimedSlot.name}</strong>
-                  </span>
                   <button
-                    onClick={() => handleUnclaim(myClaimedSlot.slotId)}
-                    style={{
-                      backgroundColor: 'transparent',
-                      color: '#9ca3af',
-                      border: '1px solid #4b5563',
-                      borderRadius: '5px',
-                      padding: '3px 8px',
-                      cursor: 'pointer',
-                      fontSize: '11px',
-                    }}
+                    id="rotate-cw-btn"
+                    onClick={() => setSelectedPerspectiveSeat((prev) => {
+                      const cur = prev !== null ? prev : activePerspectiveSeat;
+                      const seatMod = totalSlots || 6;
+                      return (cur + 1) % seatMod;
+                    })}
+                    style={{ flex: 1, padding: '8px 10px', backgroundColor: '#242436', border: '1px solid #374151', borderRadius: '6px', color: '#e5e7eb', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
                   >
-                    Reset Claim
+                    ↻ +60°
                   </button>
+                  {myClaimedSlot && (
+                    <button
+                      id="rotate-reset-btn"
+                      onClick={() => {
+                        const myIdx = room.players.findIndex(p => p.slotId === myClaimedSlot.slotId);
+                        if (myIdx >= 0) {
+                          const targetSeat = (totalSlots === 8 || totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3) ? getSeatIndexForPlayer(myIdx, totalSlots) : myIdx;
+                          setSelectedPerspectiveSeat(targetSeat);
+                        }
+                      }}
+                      style={{ padding: '8px 10px', backgroundColor: '#1e3a8a', border: '1px solid #3b82f6', borderRadius: '6px', color: '#bfdbfe', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                    >
+                      My Seat
+                    </button>
+                  )}
                 </div>
-              )}
-            </div>
-
-            {/* Players Seating & Hand Tile Summary */}
-            <div
-              id="players-roster-panel"
-              style={{
-                backgroundColor: '#161622',
-                border: '1px solid #272738',
-                borderRadius: '12px',
-                padding: '14px',
-              }}
-            >
+              </div>
+            ) : (
+              /* Block 3 (Draft): Table Seating Order */
               <div
+                id="seating-order-card"
                 style={{
-                  fontSize: '11px',
-                  fontWeight: '700',
-                  color: '#9ca3af',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.05em',
-                  marginBottom: '10px',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'center',
+                  backgroundColor: '#161622',
+                  border: '1px solid #272738',
+                  borderRadius: '12px',
+                  padding: '14px',
                 }}
               >
-                <span>Table Seating Order</span>
-                <span style={{ fontSize: '10px', color: '#6b7280' }}>Remaining Hand</span>
-              </div>
-
-              {selectedPerspectiveSeat !== null && (
-                <div style={{ marginBottom: '8px' }}>
-                  <button
-                    onClick={() => setSelectedPerspectiveSeat(null)}
-                    style={{
-                      width: '100%',
-                      backgroundColor: '#1f2937',
-                      color: '#93c5fd',
-                      border: '1px solid #374151',
-                      borderRadius: '6px',
-                      padding: '5px 8px',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '4px',
-                    }}
-                  >
-                    <span>↺</span> Reset View to My Seat
-                  </button>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>Table Seating Order</span>
+                  <span style={{ fontSize: '10px', color: '#6b7280' }}>Remaining Hand</span>
                 </div>
-              )}
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {room.players.map((p, playerIdx) => {
-                  const isMe = Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId;
-                  const initialBlue = totalSlots === 3 ? 6 : 3;
-                  const blueCount = p.remainingBlue ?? p.hand?.blue?.length ?? initialBlue;
-                  const redCount = p.remainingRed ?? p.hand?.red?.length ?? 2;
-                  const targetSeat = (totalSlots === 8 || totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3)
-                    ? getSeatIndexForPlayer(playerIdx, totalSlots)
-                    : playerIdx;
-                  const isOriented = activePerspectiveSeat === targetSeat;
-
-                  return (
-                    <div
-                      key={p.slotId}
-                      onClick={() => setSelectedPerspectiveSeat(targetSeat)}
-                      style={{
-                        backgroundColor: isMe ? '#1e293b' : isOriented ? '#162032' : '#11111b',
-                        border: `1px solid ${isMe ? '#3b82f6' : isOriented ? '#10b981' : '#272738'}`,
-                        borderRadius: '8px',
-                        padding: '8px 10px',
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        cursor: 'pointer',
-                        transition: 'all 0.15s ease',
-                      }}
-                      title={`Click to view board from ${p.name}'s seat`}
+                {selectedPerspectiveSeat !== null && (
+                  <div style={{ marginBottom: '8px' }}>
+                    <button
+                      onClick={() => setSelectedPerspectiveSeat(null)}
+                      style={{ width: '100%', backgroundColor: '#1f2937', color: '#93c5fd', border: '1px solid #374151', borderRadius: '6px', padding: '5px 8px', fontSize: '11px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {p.isSpeaker && <span title="Speaker token">👑</span>}
-                        <span style={{ fontSize: '13px', fontWeight: isMe ? '700' : '500', color: isMe ? '#93c5fd' : '#e5e7eb' }}>
-                          {p.name}
-                        </span>
-                        {isMe && (
-                          <span style={{ fontSize: '9px', backgroundColor: '#2563eb', padding: '1px 5px', borderRadius: '4px', color: '#fff', fontWeight: 'bold' }}>
-                            YOU
-                          </span>
-                        )}
-                        {isOriented && !isMe && (
-                          <span style={{ fontSize: '9px', backgroundColor: '#064e3b', padding: '1px 5px', borderRadius: '4px', color: '#34d399', fontWeight: 'bold' }}>
-                            VIEWING
-                          </span>
-                        )}
-                      </div>
+                      <span>↺</span> Reset View to My Seat
+                    </button>
+                  </div>
+                )}
 
-                      {/* Mini Hexagon badges */}
-                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                        <span
-                          title={`${blueCount} Blue tiles in hand`}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            color: '#93c5fd',
-                          }}
-                        >
-                          <svg width="14" height="14" viewBox="-10 -10 20 20">
-                            <polygon points="-8,0 -4,-7 4,-7 8,0 4,7 -4,7" fill="#1d4ed8" stroke="#60a5fa" strokeWidth="1" />
-                          </svg>
-                          {blueCount}
-                        </span>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {room.players.map((p, playerIdx) => {
+                    const isMe = Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId;
+                    const initialBlue = totalSlots === 3 ? 6 : 3;
+                    const blueCount = p.remainingBlue ?? p.hand?.blue?.length ?? initialBlue;
+                    const redCount = p.remainingRed ?? p.hand?.red?.length ?? 2;
+                    const targetSeat = (totalSlots === 8 || totalSlots === 7 || totalSlots === 5 || totalSlots === 4 || totalSlots === 3)
+                      ? getSeatIndexForPlayer(playerIdx, totalSlots)
+                      : playerIdx;
+                    const isOriented = activePerspectiveSeat === targetSeat;
 
-                        <span
-                          title={`${redCount} Red tiles in hand`}
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            fontSize: '11px',
-                            fontWeight: '700',
-                            color: '#fca5a5',
-                          }}
-                        >
-                          <svg width="14" height="14" viewBox="-10 -10 20 20">
-                            <polygon points="-8,0 -4,-7 4,-7 8,0 4,7 -4,7" fill="#b91c1c" stroke="#f87171" strokeWidth="1" />
-                          </svg>
-                          {redCount}
-                        </span>
+                    return (
+                      <div
+                        key={p.slotId}
+                        onClick={() => setSelectedPerspectiveSeat(targetSeat)}
+                        style={{
+                          backgroundColor: isMe ? '#1e293b' : isOriented ? '#162032' : '#11111b',
+                          border: `1px solid ${isMe ? '#3b82f6' : isOriented ? '#10b981' : '#272738'}`,
+                          borderRadius: '8px',
+                          padding: '8px 10px',
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                        }}
+                        title={`Click to view board from ${p.name}'s seat`}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          {p.isSpeaker && <span title="Speaker token">👑</span>}
+                          <span style={{ fontSize: '13px', fontWeight: isMe ? '700' : '500', color: isMe ? '#93c5fd' : '#e5e7eb' }}>
+                            {p.name}
+                          </span>
+                          {isMe && (
+                            <span style={{ fontSize: '9px', backgroundColor: '#2563eb', padding: '1px 5px', borderRadius: '4px', color: '#fff', fontWeight: 'bold' }}>
+                              YOU
+                            </span>
+                          )}
+                          {isOriented && !isMe && (
+                            <span style={{ fontSize: '9px', backgroundColor: '#064e3b', padding: '1px 5px', borderRadius: '4px', color: '#34d399', fontWeight: 'bold' }}>
+                              VIEWING
+                            </span>
+                          )}
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                          <span title={`${blueCount} Blue tiles in hand`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '700', color: '#93c5fd' }}>
+                            <svg width="14" height="14" viewBox="-10 -10 20 20">
+                              <polygon points="-8,0 -4,-7 4,-7 8,0 4,7 -4,7" fill="#1d4ed8" stroke="#60a5fa" strokeWidth="1" />
+                            </svg>
+                            {blueCount}
+                          </span>
+                          <span title={`${redCount} Red tiles in hand`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '700', color: '#fca5a5' }}>
+                            <svg width="14" height="14" viewBox="-10 -10 20 20">
+                              <polygon points="-8,0 -4,-7 4,-7 8,0 4,7 -4,7" fill="#b91c1c" stroke="#f87171" strokeWidth="1" />
+                            </svg>
+                            {redCount}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Block 4: Map Summary Details (Completed Only) */}
+            {isCompleted && (
+              <div
+                id="completed-summary-card"
+                style={{
+                  backgroundColor: '#171724',
+                  border: '1px solid #28283c',
+                  borderRadius: '14px',
+                  padding: '16px',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                }}
+              >
+                <div style={{ fontSize: '11px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em', fontWeight: '700', marginBottom: '8px' }}>
+                  Galaxy Details
+                </div>
+                <div style={{ fontSize: '13px', color: '#d1d5db', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#9ca3af' }}>Speaker:</span>
+                    <strong style={{ color: '#fbbf24' }}>👑 {speaker?.name || 'Player 1'}</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#9ca3af' }}>Tiles Placed:</span>
+                    <strong style={{ color: '#34d399' }}>{Object.keys(room.mapState?.placedTiles || {}).length} tiles</strong>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                    <span style={{ color: '#9ca3af' }}>Rings Completed:</span>
+                    <strong style={{ color: '#60a5fa' }}>3 / 3 Rings</strong>
+                  </div>
+                </div>
+              </div>
+            )}
           </aside>
 
-          {/* MAIN CENTER SECTION: Large Hex Board + Player's 5 Hand Tiles */}
+          {/* MAIN COLUMN */}
           <main
-            id="map-main-column"
+            id={isCompleted ? 'completed-map-main' : 'map-main-column'}
             style={{
               flex: 1,
-              minWidth: '500px',
+              minWidth: isCompleted ? '550px' : '500px',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
             }}
           >
-            {/* Placement / Runtime Error Notification Banner */}
-            {actionError && (
+            {/* Placement Error Notification Banner (Draft mode) */}
+            {actionError && !isCompleted && (
               <div
                 id="room-action-error-banner"
                 style={{
@@ -1311,23 +924,13 @@ export default function RoomView() {
                 </div>
                 <button
                   onClick={() => setActionError(null)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#fca5a5',
-                    cursor: 'pointer',
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    padding: '0 4px',
-                  }}
-                  title="Dismiss"
+                  style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
                 >
                   ✕
                 </button>
               </div>
             )}
 
-            {/* The Big 3-Ring Hexagonal Board */}
             <MapGrid
               room={room}
               mySlot={myClaimedSlot}
@@ -1337,14 +940,15 @@ export default function RoomView() {
               isMyTurn={isMyTurn}
               onHoverTile={setHoveredTileId}
               perspectiveSeatIndex={activePerspectiveSeat}
-              isCompleted={false}
-              showTileCounts={true}
+              isCompleted={isCompleted}
+              showTileCounts={!isCompleted}
+              showTileNumbers={showTileNumbers}
               isFullscreen={isFullscreen}
               onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
             />
 
-            {/* Placement Action Bar with Accept button */}
-            {selectedTileId && isMyTurn && (
+            {/* Placement Action Bar with Accept button (Draft mode) */}
+            {!isCompleted && selectedTileId && isMyTurn && (
               <div
                 style={{
                   marginTop: '14px',
@@ -1390,16 +994,7 @@ export default function RoomView() {
                 <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
                   <button
                     onClick={handleCancelPlacement}
-                    style={{
-                      backgroundColor: '#374151',
-                      color: '#d1d5db',
-                      border: 'none',
-                      borderRadius: '6px',
-                      padding: '8px 14px',
-                      fontSize: '13px',
-                      cursor: 'pointer',
-                      fontWeight: '600',
-                    }}
+                    style={{ backgroundColor: '#374151', color: '#d1d5db', border: 'none', borderRadius: '6px', padding: '8px 14px', fontSize: '13px', cursor: 'pointer', fontWeight: '600' }}
                   >
                     Cancel
                   </button>
@@ -1427,13 +1022,15 @@ export default function RoomView() {
               </div>
             )}
 
-            {/* Row of 5 Tiles at the bottom (player hand) */}
-            <PlayerHandPanel
-              player={myClaimedSlot}
-              activeTileId={selectedTileId}
-              onSelectTile={handleSelectTile}
-              onHoverTile={setHoveredTileId}
-            />
+            {/* Row of 5 Tiles at the bottom (Draft mode) */}
+            {!isCompleted && myClaimedSlot && (
+              <PlayerHandPanel
+                player={myClaimedSlot}
+                activeTileId={selectedTileId}
+                onSelectTile={handleSelectTile}
+                onHoverTile={setHoveredTileId}
+              />
+            )}
           </main>
         </div>
       )}
@@ -1458,68 +1055,72 @@ const headerCardStyle = {
 };
 
 const chipStyle = {
-  backgroundColor: '#28283c',
-  color: '#d1d5db',
+  fontSize: '12px',
   padding: '4px 10px',
   borderRadius: '6px',
-  fontSize: '13px',
+  backgroundColor: '#2b2b3f',
+  color: '#e5e7eb',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '4px',
 };
 
 const miniChipStyle = {
-  backgroundColor: '#202030',
-  color: '#cbd5e1',
-  padding: '3px 8px',
-  borderRadius: '5px',
   fontSize: '11px',
+  padding: '2px 7px',
+  borderRadius: '4px',
+  backgroundColor: '#242436',
+  color: '#d1d5db',
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '3px',
 };
 
 const copyBtnStyle = (copied) => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: '8px',
   padding: '8px 16px',
+  fontSize: '13px',
+  fontWeight: '600',
   backgroundColor: copied ? '#059669' : '#2563eb',
   color: '#fff',
   border: 'none',
   borderRadius: '6px',
   cursor: 'pointer',
-  fontSize: '14px',
-  fontWeight: '500',
-  transition: 'background-color 0.2s',
+  transition: 'all 0.2s',
 });
 
 const claimBtnStyle = {
   width: '100%',
-  padding: '10px 16px',
-  backgroundColor: '#2563eb',
+  padding: '10px',
+  backgroundColor: '#059669',
   color: '#fff',
   border: 'none',
   borderRadius: '6px',
   cursor: 'pointer',
-  fontWeight: '600',
   fontSize: '14px',
-  transition: 'background-color 0.15s ease',
+  fontWeight: '600',
+  transition: 'background-color 0.2s',
 };
 
 const unclaimBtnStyle = {
   width: '100%',
-  padding: '10px 16px',
-  backgroundColor: '#dc2626',
-  color: '#fff',
-  border: 'none',
+  padding: '10px',
+  backgroundColor: '#374151',
+  color: '#d1d5db',
+  border: '1px solid #4b5563',
   borderRadius: '6px',
   cursor: 'pointer',
-  fontWeight: '600',
   fontSize: '14px',
+  fontWeight: '600',
+  transition: 'background-color 0.2s',
 };
 
 const claimedDisabledBtnStyle = {
   width: '100%',
-  padding: '10px 16px',
-  backgroundColor: '#272738',
+  padding: '10px',
+  backgroundColor: '#262638',
   color: '#6b7280',
-  border: 'none',
+  border: '1px solid #323248',
   borderRadius: '6px',
+  fontSize: '13px',
   cursor: 'not-allowed',
-  fontSize: '14px',
 };

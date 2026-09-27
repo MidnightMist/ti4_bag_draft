@@ -515,14 +515,6 @@ export const FIVE_PLAYER_PLAYER_TO_SEAT_INDEX = {
 
 export function getPlayerForSeatIndex(players, seatIndex, playerCount = 6) {
   if (!players || players.length === 0) return null;
-  if (playerCount === 8) {
-    const pIdx = EIGHT_PLAYER_SEAT_TO_PLAYER_INDEX[seatIndex];
-    return pIdx !== undefined ? players[pIdx] : null;
-  }
-  if (playerCount === 7) {
-    const pIdx = SEVEN_PLAYER_SEAT_TO_PLAYER_INDEX[seatIndex];
-    return pIdx !== undefined ? players[pIdx] : null;
-  }
   if (playerCount === 5) {
     const pIdx = FIVE_PLAYER_SEAT_TO_PLAYER_INDEX[seatIndex];
     return pIdx !== undefined ? players[pIdx] : null;
@@ -539,23 +531,86 @@ export function getPlayerForSeatIndex(players, seatIndex, playerCount = 6) {
 }
 
 export function getSeatIndexForPlayer(playerIndex, playerCount = 6) {
-  if (playerCount === 8) {
-    return EIGHT_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
-  }
-  if (playerCount === 7) {
-    return SEVEN_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
-  }
-  if (playerCount === 5) {
-    return FIVE_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
-  }
-  if (playerCount === 4) {
-    return FOUR_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
-  }
-  if (playerCount === 3) {
-    return THREE_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
-  }
+  if (playerCount === 5) return FIVE_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
+  if (playerCount === 4) return FOUR_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
+  if (playerCount === 3) return THREE_PLAYER_PLAYER_TO_SEAT_INDEX[playerIndex] ?? 0;
   return playerIndex;
 }
+
+const EXTRA_ADJACENCY_MAP_8 = {
+  'ring-1-neg15': ['ring-1-pos05'],
+  'ring-1-pos05': ['ring-1-neg15', 'ring-2-neg1'],
+  'ring-2-neg1': ['ring-1-pos05'],
+  'ring-2-0': ['ring-4-pos1'],
+  'ring-2-pos1': ['ring-4-pos1'],
+  'ring-4-pos1': ['ring-2-0', 'ring-2-pos1'],
+  'ring-neg1-neg05': ['ring-neg1-pos15', 'ring-neg2-pos1'],
+  'ring-neg1-pos15': ['ring-neg1-neg05'],
+  'ring-neg2-pos1': ['ring-neg1-neg05'],
+  'ring-neg2-neg1': ['ring-neg4-neg1'],
+  'ring-neg2-0': ['ring-neg4-neg1'],
+  'ring-neg4-neg1': ['ring-neg2-neg1', 'ring-neg2-0'],
+};
+
+const EXTRA_ADJACENCY_MAP_7 = {
+  'ring-1-neg35': ['ring-2-neg2', 'ring-1-neg15'],
+  'ring-2-neg2': ['ring-1-neg35'],
+  'ring-1-neg15': ['ring-0-neg3', 'ring-1-neg35'],
+  'ring-0-neg3': ['ring-1-neg15'],
+  'ring-1-neg05': ['ring-0-neg2'],
+  'ring-0-neg2': ['ring-1-neg05'],
+  'ring-neg2-neg1': ['ring-neg4-neg1'],
+  'ring-neg4-neg1': ['ring-neg2-0', 'ring-neg2-neg1'],
+  'ring-neg2-0': ['ring-neg4-neg1'],
+  'ring-neg1-neg05': ['ring-neg2-pos1', 'ring-neg1-pos15'],
+  'ring-neg2-pos1': ['ring-neg1-neg05'],
+  'ring-neg1-pos15': ['ring-neg1-neg05'],
+  'ring-1-pos05': ['ring-0-pos2'],
+  'ring-0-pos2': ['ring-1-pos05'],
+  'ring-1-pos15': ['ring-0-pos3', 'ring-1-pos35'],
+  'ring-0-pos3': ['ring-1-pos15'],
+  'ring-1-pos35': ['ring-1-pos15', 'ring-2-pos2'],
+  'ring-2-pos2': ['ring-1-pos35'],
+};
+
+const EXTRA_ADJACENCY_MAP_5 = {
+  'ring1-1': ['ring1-5', 'ring2-corner-0'],
+  'ring1-5': ['ring1-1', 'ring2-corner-0'],
+  'ring2-corner-0': [
+    'ring1-1', 'ring1-5', 'ring2-corner-5',
+    'ring3-edge-5-1', 'ring3-edge-0-2', 'ring2-corner-1'
+  ],
+  'ring2-corner-5': ['ring2-corner-0'],
+  'ring3-edge-5-1': ['ring2-corner-0', 'ring3-edge-0-2'],
+  'ring3-edge-0-2': ['ring2-corner-0', 'ring3-edge-5-1'],
+  'ring2-corner-1': ['ring2-corner-0']
+};
+
+const EXTRA_ADJACENCY_MAP_4 = {
+  'ring1-0': ['ring1-1', 'ring1-5', 'ring2-corner-0'],
+  'ring1-1': ['ring1-0', 'ring1-5', 'ring2-corner-0'],
+  'ring1-5': ['ring1-0', 'ring1-1', 'ring2-corner-0'],
+  'ring2-corner-0': [
+    'ring1-0', 'ring1-1', 'ring1-5', 'ring2-corner-5',
+    'ring3-edge-5-1', 'ring3-edge-0-2', 'ring2-corner-1'
+  ],
+  'ring2-corner-5': ['ring2-corner-0'],
+  'ring3-edge-5-1': ['ring2-corner-0', 'ring3-edge-0-2'],
+  'ring3-edge-0-2': ['ring2-corner-0', 'ring3-edge-5-1'],
+  'ring2-corner-1': ['ring2-corner-0'],
+  'ring1-3': ['ring1-2', 'ring1-4', 'ring2-corner-3'],
+  'ring1-2': ['ring1-3', 'ring1-4', 'ring2-corner-3'],
+  'ring1-4': ['ring1-3', 'ring1-2', 'ring2-corner-3'],
+  'ring2-corner-3': [
+    'ring1-3', 'ring1-2', 'ring1-4', 'ring2-corner-2',
+    'ring3-edge-2-2', 'ring3-edge-3-1', 'ring3-edge-3-2', 'ring2-corner-4'
+  ],
+  'ring2-corner-2': ['ring2-corner-3'],
+  'ring3-edge-2-2': ['ring2-corner-3', 'ring3-edge-3-1', 'ring3-edge-3-2'],
+  'ring3-edge-3-1': ['ring2-corner-3', 'ring3-edge-2-2', 'ring3-edge-3-2'],
+  'ring3-edge-3-2': ['ring2-corner-3', 'ring3-edge-2-2', 'ring3-edge-3-1'],
+  'ring2-corner-4': ['ring2-corner-3']
+};
 
 export function getHexNeighbors(hex, allHexes = ALL_37_HEXES, playerCount = 6) {
   const neighbors = [];
@@ -570,155 +625,14 @@ export function getHexNeighbors(hex, allHexes = ALL_37_HEXES, playerCount = 6) {
     }
   }
 
-  // 8-player slot-based neighborhood adjacency connections:
-  if (playerCount === 8) {
-    const extraAdjacencyMap8 = {
-      'ring-1-neg15': ['ring-1-pos05'],
-      'ring-1-pos05': ['ring-1-neg15', 'ring-2-neg1'],
-      'ring-2-neg1': ['ring-1-pos05'],
-      'ring-2-0': ['ring-4-pos1'],
-      'ring-2-pos1': ['ring-4-pos1'],
-      'ring-4-pos1': ['ring-2-0', 'ring-2-pos1'],
-      'ring-neg1-neg05': ['ring-neg1-pos15', 'ring-neg2-pos1'],
-      'ring-neg1-pos15': ['ring-neg1-neg05'],
-      'ring-neg2-pos1': ['ring-neg1-neg05'],
-      'ring-neg2-neg1': ['ring-neg4-neg1'],
-      'ring-neg2-0': ['ring-neg4-neg1'],
-      'ring-neg4-neg1': ['ring-neg2-neg1', 'ring-neg2-0'],
-    };
+  const extraMap = playerCount === 8 ? EXTRA_ADJACENCY_MAP_8
+    : playerCount === 7 ? EXTRA_ADJACENCY_MAP_7
+    : playerCount === 5 ? EXTRA_ADJACENCY_MAP_5
+    : playerCount === 4 ? EXTRA_ADJACENCY_MAP_4
+    : null;
 
-    const extras = extraAdjacencyMap8[hex.id];
-    if (extras) {
-      extras.forEach(extraId => {
-        if (!neighbors.some(n => n.id === extraId)) {
-          const target = allHexes.find(h => h.id === extraId);
-          if (target) neighbors.push(target);
-        }
-      });
-    }
-  }
-
-  // 7-player slot-based neighborhood adjacency connections:
-  if (playerCount === 7) {
-    const extraAdjacencyMap7 = {
-      'ring-1-neg35': ['ring-2-neg2', 'ring-1-neg15'],
-      'ring-2-neg2': ['ring-1-neg35'],
-      'ring-1-neg15': ['ring-0-neg3', 'ring-1-neg35'],
-      'ring-0-neg3': ['ring-1-neg15'],
-      'ring-1-neg05': ['ring-0-neg2'],
-      'ring-0-neg2': ['ring-1-neg05'],
-      'ring-neg2-neg1': ['ring-neg4-neg1'],
-      'ring-neg4-neg1': ['ring-neg2-0', 'ring-neg2-neg1'],
-      'ring-neg2-0': ['ring-neg4-neg1'],
-      'ring-neg1-neg05': ['ring-neg2-pos1', 'ring-neg1-pos15'],
-      'ring-neg2-pos1': ['ring-neg1-neg05'],
-      'ring-neg1-pos15': ['ring-neg1-neg05'],
-      'ring-1-pos05': ['ring-0-pos2'],
-      'ring-0-pos2': ['ring-1-pos05'],
-      'ring-1-pos15': ['ring-0-pos3', 'ring-1-pos35'],
-      'ring-0-pos3': ['ring-1-pos15'],
-      'ring-1-pos35': ['ring-1-pos15', 'ring-2-pos2'],
-      'ring-2-pos2': ['ring-1-pos35'],
-    };
-
-    const extras = extraAdjacencyMap7[hex.id];
-    if (extras) {
-      extras.forEach(extraId => {
-        if (!neighbors.some(n => n.id === extraId)) {
-          const target = allHexes.find(h => h.id === extraId);
-          if (target) neighbors.push(target);
-        }
-      });
-    }
-  }
-
-  // 5-player hyperlane connections:
-  // 1: ring1-1 (South-West ring 1)
-  // 2: ring1-5 (South-East ring 1)
-  // 3: ring2-corner-5 (South-East ring 2)
-  // 4: ring3-edge-5-1 (South-East ring 3 edge)
-  // 5: ring3-edge-0-2 (South-West ring 3 edge)
-  // 6: ring2-corner-1 (South-West ring 2)
-  // 7: ring2-corner-0 (South ring 2 corner)
-  if (playerCount === 5) {
-    const extraAdjacencyMap = {
-      // 1 is adjacent to 2 and 7
-      'ring1-1': ['ring1-5', 'ring2-corner-0'],
-      // 2 is adjacent to 1 and 7
-      'ring1-5': ['ring1-1', 'ring2-corner-0'],
-      // 7 is adjacent to 1, 2, 3, 4, 5, 6
-      'ring2-corner-0': [
-        'ring1-1',
-        'ring1-5',
-        'ring2-corner-5',
-        'ring3-edge-5-1',
-        'ring3-edge-0-2',
-        'ring2-corner-1'
-      ],
-      // 3 is adjacent to 7
-      'ring2-corner-5': ['ring2-corner-0'],
-      // 4 is adjacent to 7 and 5
-      'ring3-edge-5-1': ['ring2-corner-0', 'ring3-edge-0-2'],
-      // 5 is adjacent to 7 and 4
-      'ring3-edge-0-2': ['ring2-corner-0', 'ring3-edge-5-1'],
-      // 6 is adjacent to 7
-      'ring2-corner-1': ['ring2-corner-0']
-    };
-
-    const extras = extraAdjacencyMap[hex.id];
-    if (extras) {
-      extras.forEach(extraId => {
-        if (!neighbors.some(n => n.id === extraId)) {
-          const target = allHexes.find(h => h.id === extraId);
-          if (target) neighbors.push(target);
-        }
-      });
-    }
-  }
-
-  if (playerCount === 4) {
-    // 4-player hyperlane adjacency map (supports both South and North hyperlane corridors)
-    const extraAdjacencyMap4 = {
-      // South corridor (d = 0)
-      'ring1-0': ['ring1-1', 'ring1-5', 'ring2-corner-0'],
-      'ring1-1': ['ring1-0', 'ring1-5', 'ring2-corner-0'],
-      'ring1-5': ['ring1-0', 'ring1-1', 'ring2-corner-0'],
-      'ring2-corner-0': [
-        'ring1-0',
-        'ring1-1',
-        'ring1-5',
-        'ring2-corner-5',
-        'ring3-edge-5-1',
-        'ring3-edge-0-2',
-        'ring2-corner-1'
-      ],
-      'ring2-corner-5': ['ring2-corner-0'],
-      'ring3-edge-5-1': ['ring2-corner-0', 'ring3-edge-0-2'],
-      'ring3-edge-0-2': ['ring2-corner-0', 'ring3-edge-5-1'],
-      'ring2-corner-1': ['ring2-corner-0'],
-
-      // North corridor (d = 3) - ring1-3, ring1-2, ring1-4 connected through hyperlane/corner-3
-      'ring1-3': ['ring1-2', 'ring1-4', 'ring2-corner-3'],
-      'ring1-2': ['ring1-3', 'ring1-4', 'ring2-corner-3'],
-      'ring1-4': ['ring1-3', 'ring1-2', 'ring2-corner-3'],
-      'ring2-corner-3': [
-        'ring1-3',
-        'ring1-2',
-        'ring1-4',
-        'ring2-corner-2',
-        'ring3-edge-2-2',
-        'ring3-edge-3-1',
-        'ring3-edge-3-2',
-        'ring2-corner-4'
-      ],
-      'ring2-corner-2': ['ring2-corner-3'],
-      'ring3-edge-2-2': ['ring2-corner-3', 'ring3-edge-3-1', 'ring3-edge-3-2'],
-      'ring3-edge-3-1': ['ring2-corner-3', 'ring3-edge-2-2', 'ring3-edge-3-2'],
-      'ring3-edge-3-2': ['ring2-corner-3', 'ring3-edge-2-2', 'ring3-edge-3-1'],
-      'ring2-corner-4': ['ring2-corner-3']
-    };
-
-    const extras = extraAdjacencyMap4[hex.id];
+  if (extraMap) {
+    const extras = extraMap[hex.id];
     if (extras) {
       extras.forEach(extraId => {
         if (!neighbors.some(n => n.id === extraId)) {
