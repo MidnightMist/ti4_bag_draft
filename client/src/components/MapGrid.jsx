@@ -56,6 +56,7 @@ function HexTile({
   playerName = '',
   selectedFaction = null,
   isViewer = false,
+  isOriented = false,
   isSpeaker = false,
   onClick,
   onMouseEnter,
@@ -102,7 +103,7 @@ function HexTile({
               />
 
               {/* Viewer Glow */}
-              {isViewer && (
+              {(isViewer || isOriented) && (
                 <polygon
                   points={getFlatHexPoints(0, 0, R + 4)}
                   fill="none"
@@ -116,8 +117,8 @@ function HexTile({
               <polygon
                 points={hexPoints}
                 fill="none"
-                stroke={isViewer ? '#34d399' : '#059669'}
-                strokeWidth={isViewer ? 2.5 : 1.5}
+                stroke={isViewer || isOriented ? '#34d399' : '#059669'}
+                strokeWidth={isViewer || isOriented ? 2.5 : 1.5}
               />
 
               {/* Speaker Crown if applicable */}
@@ -133,16 +134,6 @@ function HexTile({
                 </text>
               )}
 
-              {/* "YOU" badge if viewer and not speaker */}
-              {isViewer && !isSpeaker && (
-                <g transform="translate(0, -25)">
-                  <rect x="-18" y="-8" width="36" height="15" rx="3" fill="#047857" stroke="#34d399" strokeWidth="1" />
-                  <text x="0" y="3" textAnchor="middle" fill="#ecfdf5" fontSize="9" fontWeight="bold">
-                    YOU
-                  </text>
-                </g>
-              )}
-
               {/* Subtle Player Name Badge at bottom */}
               <g transform="translate(0, 32)">
                 <rect
@@ -153,7 +144,7 @@ function HexTile({
                   rx="4"
                   fill="#070a13"
                   fillOpacity="0.85"
-                  stroke={isViewer ? '#34d399' : '#059669'}
+                  stroke={isViewer || isOriented ? '#34d399' : '#059669'}
                   strokeWidth="1"
                 />
                 <text
@@ -192,7 +183,7 @@ function HexTile({
           ) : (
             <g>
               {/* Glow if viewer */}
-              {isViewer && (
+              {(isViewer || isOriented) && (
                 <polygon
                   points={getFlatHexPoints(0, 0, R + 5)}
                   fill="none"
@@ -206,8 +197,8 @@ function HexTile({
               <polygon
                 points={hexPoints}
                 fill="url(#green-home-system-grad)"
-                stroke={isViewer ? '#34d399' : '#059669'}
-                strokeWidth={isViewer ? 3 : 2}
+                stroke={isViewer || isOriented ? '#34d399' : '#059669'}
+                strokeWidth={isViewer || isOriented ? 3 : 2}
               />
 
               {/* Inner subtle border accent */}
@@ -231,16 +222,6 @@ function HexTile({
                 >
                   👑
                 </text>
-              )}
-
-              {/* "YOU" badge if viewer */}
-              {isViewer && !isSpeaker && (
-                <g transform="translate(0, -27)">
-                  <rect x="-20" y="-9" width="40" height="17" rx="4" fill="#047857" stroke="#34d399" strokeWidth="1" />
-                  <text x="0" y="3" textAnchor="middle" fill="#ecfdf5" fontSize="10" fontWeight="bold">
-                    YOU
-                  </text>
-                </g>
               )}
 
               {/* Player Name */}
