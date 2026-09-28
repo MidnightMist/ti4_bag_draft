@@ -58,11 +58,12 @@
     - **Draft Rules & Hand Quotas:**
       - Each player aims to draft their full hand: **3 Blue tiles** (6 in 3-player), **2 Red tiles**, and **2 Factions** across circular draft rounds.
       - **Mandatory Pick Rule:** When a player receives a draft hand, if there is ANY valid item in the hand that does not exceed their quotas (has available blue, red, or faction quota space), the player **MUST** select and draft an item. Voluntary passing/skipping is strictly prohibited.
-      - **Conditional Pass Rule:** A player is granted the option to skip/pass their turn and pass the hand forward **ONLY** in the event that **ALL** elements remaining in the offered hand belong to categories where the player's hand limit has already been reached (e.g. hand contains only blue tiles but the player already has 3 blue tiles, or hand contains only factions but the player already has 2 factions). In this scenario, the interface renders a prominent pass warning and button (`Pass Turn`), allowing the player to pass the unpicked hand clockwise without being locked out.
+      - **Automatic Passing Without Stalling:** If a player has only the option to pass (either because all elements in the offered hand exceed their remaining quotas, or because the player has already finished collecting their full hand of 7 items), they **do not need to press any button**. The server marks them as auto-passed immediately. They can still view and inspect incoming hands, but they do not stall or delay the draft. Only players who have valid choices available need to submit a pick.
       - Server-authoritative validation enforces that `itemType: 'pass'` is rejected with an error if valid draft options exist in the player's hand.
     - **Screen Structure (3 Zones):**
       - **Top Zone:** Seen elements strip (shows factions and tiles seen during draft: initially the 2 factions seen during ban phase + 5 tiles and 2 factions received now; no duplicates).
       - **Central Zone (Dominant):** Current draft hand containing the faction sheets and system tiles available to pick in this round.
+        - **Consistent Faction Card Sizing:** When a single faction remains in the hand, its card retains the exact same size as when two factions are present (occupying 1 column in a 2-column grid, avoiding full-width enlargement).
       - **Bottom Zone:** Accumulator strip for elements picked by the player during the draft (initially empty).
     - **Hover Enlarged Previews (`DraftItemZoomPreview.jsx`):** Enlarged tooltip preview for all tiles and factions across all 3 zones.
       - Factions open a high-resolution, full-width sheet card preserving the 2800x1625 aspect ratio.
@@ -73,7 +74,7 @@
       - The draft continues circulating hands round after round until **EVERY PLAYER HAS COLLECTED THEIR COMPLETE HAND** (all 7 required items: 3 Blue tiles, 2 Red tiles, 2 Factions in 4-8 player games; 10 required items: 6 Blue tiles, 2 Red tiles, 2 Factions in 3-player games).
       - Players whose hands are already full will continue to pass any incoming hands to other players who still need items.
       - Once all players in the room reach their full item quotas (or as a safety fallback if all hands are exhausted), the draft concludes and the room transitions to the `map_building` phase with players' drafted tiles forming their active building hands.
-    - **Dev Toolbar:** Allows switching active seat between players for easy multi-seat debugging, fast-forwarding bans (`dev_autoban_room`), and auto-drafting rounds (`dev_autodraft_round`).
+    - **Dev Toolbar:** Allows switching active seat between players for easy multi-seat debugging, fast-forwarding bans (`dev_autoban_room`), auto-drafting a single round with random valid picks (`dev_autodraft_round`), and randomly distributing all remaining draft elements among all participants to finish the draft immediately (`dev_autodraft_all`).
 
 ### Phase 2.1: Developer & Testing Toolbar (`DevToolbar.jsx`)
 - **Single-Seat Quick Testing:**

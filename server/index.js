@@ -109,6 +109,186 @@ function startFactionBan(room) {
   }
 }
 
+function isPlayerDraftComplete(player, playerCount) {
+  if (!player) return false;
+  const maxBlue = playerCount === 3 ? 6 : 3;
+  const maxRed = 2;
+  const maxFactions = 2;
+  const pickedTiles = player.pickedItems?.tiles || [];
+  const pickedFactions = player.pickedItems?.factions || [];
+  const blueCount = pickedTiles.filter(t => !isRedTile(t)).length;
+  const redCount = pickedTiles.filter(t => isRedTile(t)).length;
+  const factionCount = pickedFactions.length;
+
+  return blueCount >= maxBlue && redCount >= maxRed && factionCount >= maxFactions;
+}
+
+function hasPlayerValidPick(player, hand, playerCount) {
+  if (!player || !hand) return false;
+  const maxBlue = playerCount === 3 ? 6 : 3;
+  const maxRed = 2;
+  const maxFactions = 2;
+  const pickedTiles = player.pickedItems?.tiles || [];
+  const pickedFactions = player.pickedItems?.factions || [];
+  const blueCount = pickedTiles.filter(t => !isRedTile(t)).length;
+  const redCount = pickedTiles.filter(t => isRedTile(t)).length;
+  const factionCount = pickedFactions.length;
+
+  const isFull = blueCount >= maxBlue && redCount >= maxRed && factionCount >= maxFactions;
+  if (isFull) return false;
+
+  const hasBlueRoom = blueCount < maxBlue;
+  const hasRedRoom = redCount < maxRed;
+  const hasFactionRoom = factionCount < maxFactions;
+
+  const canTakeTile = (hand.tiles || []).some(t => isRedTile(t) ? hasRedRoom : hasBlueRoom);
+  const canTakeFaction = (hand.factions || []).some(() => hasFactionRoom);
+
+  return canTakeTile || canTakeFaction;
+}
+
+function areAllHandsEmpty(hands) {
+  if (!hands || hands.length === 0) return true;
+  return hands.every(h => (!h.tiles || h.tiles.length === 0) && (!h.factions || h.factions.length === 0));
+}
+
+function applyAutoPasses(room) {
+  if (!room.draftState || !room.draftState.hands) return;
+  const playerCount = room.settings?.playerCount || room.players.length;
+
+  room.players.forEach(p => {
+    if (room.draftState.pendingSelections[p.slotId]) return;
+
+    const hand = room.draftState.hands.find(h => h.slotId === p.slotId) || p.draftHand;
+    if (!hasPlayerValidPick(p, hand, playerCount)) {
+      room.draftState.pendingSelections[p.slotId] = {
+        isPass: true,
+        itemType: null,
+        itemId: null,
+        autoPass: true,
+      };
+    }
+  });
+}
+
+function advanceDraftRound(room, depth = 0) {
+  if (depth > 50) {
+    // Safety fallback against excessive recursion
+    startMapBuilding(room);
+    delete room.draftState;
+    return;
+  }
+
+  const playerCount = room.settings?.playerCount || room.players.length;
+
+  // 1. Ensure all selections from this round are recorded in pickedItems
+  let anyItemPickedThisRound = false;
+  room.players.forEach(p => {
+    const pSel = room.draftState.pendingSelections[p.slotId];
+    if (pSel && !pSel.isPass && pSel.itemId !== null) {
+      anyItemPickedThisRound = true;
+      if (pSel.itemType === 'faction') {
+        if (!p.pickedItems.factions.includes(pSel.itemId)) {
+          p.pickedItems.factions.push(pSel.itemId);
+        }
+      } else {
+        const numTile = Number(pSel.itemId);
+        if (!p.pickedItems.tiles.includes(numTile)) {
+          p.pickedItems.tiles.push(numTile);
+        }
+      }
+    }
+    p.draftPicksCount = (p.pickedItems.tiles?.length || 0) + (p.pickedItems.factions?.length || 0);
+  });
+
+  // 2. Remove picked items from the hands that held them
+  const currentHands = [...room.draftState.hands];
+  room.players.forEach((p) => {
+    const pSel = room.draftState.pendingSelections[p.slotId];
+    const hand = currentHands.find(h => h.slotId === p.slotId);
+    if (pSel && !pSel.isPass && pSel.itemId !== null && hand) {
+      if (pSel.itemType === 'faction') {
+        const fIdx = hand.factions.indexOf(pSel.itemId);
+        if (fIdx >= 0) hand.factions.splice(fIdx, 1);
+      } else {
+        const numTile = Number(pSel.itemId);
+        const tIdx = hand.tiles.indexOf(numTile);
+        if (tIdx >= 0) hand.tiles.splice(tIdx, 1);
+      }
+    }
+  });
+
+  // 3. Draft ends when EVERY player has collected their full hand (or safety fallback if hands are exhausted)
+  const allPlayersFull = room.players.every(p => isPlayerDraftComplete(p, playerCount));
+  const noMoreItems = areAllHandsEmpty(currentHands);
+
+  // Track consecutive rounds where no items were picked to detect true deadlocks
+  if (!anyItemPickedThisRound) {
+    room.draftState.consecutivePassRounds = (room.draftState.consecutivePassRounds || 0) + 1;
+  } else {
+    room.draftState.consecutivePassRounds = 0;
+  }
+  const isDeadlocked = (room.draftState.consecutivePassRounds || 0) >= room.players.length * 2;
+
+  if (allPlayersFull || noMoreItems || isDeadlocked) {
+    startMapBuilding(room);
+    delete room.draftState;
+    return;
+  }
+
+  // 4. Rotate hands clockwise (player i receives hand from player (i - 1 + N) % N)
+  room.draftState.roundIndex = (room.draftState.roundIndex || 0) + 1;
+  const N = room.players.length;
+  const newHands = room.players.map((p, idx) => {
+    const sourceIdx = (idx - 1 + N) % N;
+    const sourcePlayer = room.players[sourceIdx];
+    const sourceHand = currentHands.find(h => h.slotId === sourcePlayer.slotId) || currentHands[sourceIdx];
+    const nextTiles = [...sourceHand.tiles];
+    const nextFactions = [...sourceHand.factions];
+
+    // Update target player's seen items
+    nextFactions.forEach(fId => {
+      if (!p.seenItems.factions.includes(fId)) {
+        p.seenItems.factions.push(fId);
+      }
+    });
+    nextTiles.forEach(tId => {
+      if (!p.seenItems.tiles.includes(tId)) {
+        p.seenItems.tiles.push(tId);
+      }
+    });
+
+    return {
+      slotId: p.slotId,
+      tiles: nextTiles,
+      factions: nextFactions,
+    };
+  });
+
+  room.draftState.hands = newHands;
+  room.draftState.pendingSelections = {};
+
+  // Update each player's active draftHand
+  room.players.forEach(p => {
+    const h = room.draftState.hands.find(hand => hand.slotId === p.slotId);
+    if (h) {
+      p.draftHand = {
+        tiles: [...h.tiles],
+        factions: [...h.factions],
+      };
+    }
+  });
+
+  // 5. Apply auto-pass for any players who cannot make a valid pick in their new hand
+  applyAutoPasses(room);
+
+  // If after auto-passing, all players are submitted, advance immediately
+  const allSubmittedNow = room.players.every(p => room.draftState?.pendingSelections[p.slotId]);
+  if (allSubmittedNow && room.draftState) {
+    advanceDraftRound(room, depth + 1);
+  }
+}
+
 function startDraftingPhase(room) {
   room.status = 'drafting';
 
@@ -210,6 +390,8 @@ function startDraftingPhase(room) {
     // pendingSelections stores each player's selection for the current round before passing
     pendingSelections: {},
   };
+
+  applyAutoPasses(room);
 }
 
 /**
@@ -517,121 +699,7 @@ io.on('connection', (socket) => {
     io.to(roomId).emit('room_state', room);
   });
 
-function isPlayerDraftComplete(player, playerCount) {
-  if (!player) return false;
-  const maxBlue = playerCount === 3 ? 6 : 3;
-  const maxRed = 2;
-  const maxFactions = 2;
-  const pickedTiles = player.pickedItems?.tiles || [];
-  const pickedFactions = player.pickedItems?.factions || [];
-  const blueCount = pickedTiles.filter(t => !isRedTile(t)).length;
-  const redCount = pickedTiles.filter(t => isRedTile(t)).length;
-  const factionCount = pickedFactions.length;
-
-  return blueCount >= maxBlue && redCount >= maxRed && factionCount >= maxFactions;
-}
-
-function areAllHandsEmpty(hands) {
-  if (!hands || hands.length === 0) return true;
-  return hands.every(h => (!h.tiles || h.tiles.length === 0) && (!h.factions || h.factions.length === 0));
-}
-
-function advanceDraftRound(room) {
-  const playerCount = room.settings?.playerCount || room.players.length;
-
-  // 1. Ensure all selections from this round are recorded in pickedItems
-  let anyItemPickedThisRound = false;
-  room.players.forEach(p => {
-    const pSel = room.draftState.pendingSelections[p.slotId];
-    if (pSel && !pSel.isPass && pSel.itemId !== null) {
-      anyItemPickedThisRound = true;
-      if (pSel.itemType === 'faction') {
-        if (!p.pickedItems.factions.includes(pSel.itemId)) {
-          p.pickedItems.factions.push(pSel.itemId);
-        }
-      } else {
-        const numTile = Number(pSel.itemId);
-        if (!p.pickedItems.tiles.includes(numTile)) {
-          p.pickedItems.tiles.push(numTile);
-        }
-      }
-    }
-    p.draftPicksCount = (p.pickedItems.tiles?.length || 0) + (p.pickedItems.factions?.length || 0);
-  });
-
-  // 2. Remove picked items from the hands that held them
-  const currentHands = [...room.draftState.hands];
-  room.players.forEach((p) => {
-    const pSel = room.draftState.pendingSelections[p.slotId];
-    const hand = currentHands.find(h => h.slotId === p.slotId);
-    if (pSel && !pSel.isPass && pSel.itemId !== null && hand) {
-      if (pSel.itemType === 'faction') {
-        const fIdx = hand.factions.indexOf(pSel.itemId);
-        if (fIdx >= 0) hand.factions.splice(fIdx, 1);
-      } else {
-        const numTile = Number(pSel.itemId);
-        const tIdx = hand.tiles.indexOf(numTile);
-        if (tIdx >= 0) hand.tiles.splice(tIdx, 1);
-      }
-    }
-  });
-
-  // 3. Draft ends when EVERY player has collected their full hand (or safety fallback if hands are empty/all passed)
-  const allPlayersFull = room.players.every(p => isPlayerDraftComplete(p, playerCount));
-  const noMoreItems = areAllHandsEmpty(currentHands);
-  const allPassedThisRound = !anyItemPickedThisRound;
-
-  if (allPlayersFull || noMoreItems || allPassedThisRound) {
-    startMapBuilding(room);
-    delete room.draftState;
-    return;
-  }
-
-  // 4. Rotate hands clockwise (player i receives hand from player (i - 1 + N) % N)
-  room.draftState.roundIndex = (room.draftState.roundIndex || 0) + 1;
-  const N = room.players.length;
-  const newHands = room.players.map((p, idx) => {
-    const sourceIdx = (idx - 1 + N) % N;
-    const sourcePlayer = room.players[sourceIdx];
-    const sourceHand = currentHands.find(h => h.slotId === sourcePlayer.slotId) || currentHands[sourceIdx];
-    const nextTiles = [...sourceHand.tiles];
-    const nextFactions = [...sourceHand.factions];
-
-    // Update target player's seen items
-    nextFactions.forEach(fId => {
-      if (!p.seenItems.factions.includes(fId)) {
-        p.seenItems.factions.push(fId);
-      }
-    });
-    nextTiles.forEach(tId => {
-      if (!p.seenItems.tiles.includes(tId)) {
-        p.seenItems.tiles.push(tId);
-      }
-    });
-
-    return {
-      slotId: p.slotId,
-      tiles: nextTiles,
-      factions: nextFactions,
-    };
-  });
-
-  room.draftState.hands = newHands;
-  room.draftState.pendingSelections = {};
-
-  // Update each player's active draftHand
-  room.players.forEach(p => {
-    const h = room.draftState.hands.find(hand => hand.slotId === p.slotId);
-    if (h) {
-      p.draftHand = {
-        tiles: [...h.tiles],
-        factions: [...h.factions],
-      };
-    }
-  });
-}
-
-  // DEV TOOLBAR: Auto-submit draft picks for remaining bots/players in the current round
+  // DEV TOOLBAR: Auto-submit random valid draft picks for remaining bots/players in the current round
   socket.on('dev_autodraft_round', ({ roomId }) => {
     const room = rooms.get(roomId);
     if (!room || room.status !== 'drafting' || !room.draftState) return;
@@ -655,30 +723,41 @@ function advanceDraftRound(room) {
       const hasRedRoom = redCount < maxRed;
       const hasFactionRoom = factionCount < maxFactions;
 
-      // Find first valid pick
-      let chosenType = 'pass';
-      let chosenId = null;
-
-      if (hasFactionRoom && playerHand.factions && playerHand.factions.length > 0) {
-        chosenType = 'faction';
-        chosenId = playerHand.factions[0];
-      } else if (playerHand.tiles && playerHand.tiles.length > 0) {
-        const validTile = playerHand.tiles.find(t => {
-          const isRed = isRedTile(t);
-          return isRed ? hasRedRoom : hasBlueRoom;
+      // Gather all valid options in current hand
+      const validCandidates = [];
+      if (hasFactionRoom && playerHand.factions) {
+        playerHand.factions.forEach(fId => {
+          validCandidates.push({ type: 'faction', id: fId });
         });
-        if (validTile !== undefined) {
-          chosenType = 'tile';
-          chosenId = validTile;
-        }
+      }
+      if (playerHand.tiles) {
+        playerHand.tiles.forEach(tId => {
+          const isRed = isRedTile(tId);
+          if (isRed && hasRedRoom) {
+            validCandidates.push({ type: 'tile', id: Number(tId) });
+          } else if (!isRed && hasBlueRoom) {
+            validCandidates.push({ type: 'tile', id: Number(tId) });
+          }
+        });
       }
 
-      const isPass = chosenType === 'pass';
-      room.draftState.pendingSelections[player.slotId] = {
-        isPass,
-        itemType: isPass ? null : chosenType,
-        itemId: isPass ? null : (chosenType === 'tile' ? Number(chosenId) : chosenId),
-      };
+      if (validCandidates.length > 0) {
+        // Pick one randomly
+        const chosen = validCandidates[Math.floor(Math.random() * validCandidates.length)];
+        room.draftState.pendingSelections[player.slotId] = {
+          isPass: false,
+          itemType: chosen.type,
+          itemId: chosen.id,
+        };
+      } else {
+        // Auto-pass
+        room.draftState.pendingSelections[player.slotId] = {
+          isPass: true,
+          itemType: null,
+          itemId: null,
+          autoPass: true,
+        };
+      }
     });
 
     // Check if all submitted
@@ -686,6 +765,121 @@ function advanceDraftRound(room) {
     if (allSubmitted) {
       advanceDraftRound(room);
     }
+
+    io.to(roomId).emit('room_state', room);
+  });
+
+  // DEV TOOLBAR: Instantly randomly distribute all remaining draft elements among participants and complete the draft
+  socket.on('dev_autodraft_all', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.status !== 'drafting' || !room.draftState) return;
+
+    const playerCount = room.settings?.playerCount || room.players.length;
+    const maxBlue = playerCount === 3 ? 6 : 3;
+    const maxRed = 2;
+    const maxFactions = 2;
+
+    // 1. Gather all unpicked items across all player hands
+    const remainingFactions = [];
+    const remainingBlue = [];
+    const remainingRed = [];
+
+    (room.draftState.hands || []).forEach(h => {
+      (h.factions || []).forEach(f => remainingFactions.push(f));
+      (h.tiles || []).forEach(t => {
+        if (isRedTile(t)) {
+          remainingRed.push(Number(t));
+        } else {
+          remainingBlue.push(Number(t));
+        }
+      });
+    });
+
+    const shuffledFactions = shuffle(remainingFactions);
+    const shuffledBlue = shuffle(remainingBlue);
+    const shuffledRed = shuffle(remainingRed);
+
+    // 2. Distribute randomly to complete every player's hand according to element quotas
+    room.players.forEach(p => {
+      if (!p.pickedItems) {
+        p.pickedItems = { tiles: [], factions: [] };
+      }
+      const pTiles = p.pickedItems.tiles || [];
+      const pFactions = p.pickedItems.factions || [];
+
+      // Factions quota
+      while (pFactions.length < maxFactions && shuffledFactions.length > 0) {
+        const nextFaction = shuffledFactions.pop();
+        if (!pFactions.includes(nextFaction)) {
+          pFactions.push(nextFaction);
+        }
+      }
+
+      // Red tiles quota
+      let currentRedCount = pTiles.filter(t => isRedTile(t)).length;
+      while (currentRedCount < maxRed && shuffledRed.length > 0) {
+        const nextRed = shuffledRed.pop();
+        if (!pTiles.includes(nextRed)) {
+          pTiles.push(nextRed);
+          currentRedCount++;
+        }
+      }
+
+      // Blue tiles quota
+      let currentBlueCount = pTiles.filter(t => !isRedTile(t)).length;
+      while (currentBlueCount < maxBlue && shuffledBlue.length > 0) {
+        const nextBlue = shuffledBlue.pop();
+        if (!pTiles.includes(nextBlue)) {
+          pTiles.push(nextBlue);
+          currentBlueCount++;
+        }
+      }
+
+      // Safety fallback: if remaining pools somehow ran short, draw from game pool
+      const expansions = room.settings.expansions;
+      const mecatolId = getMecatolTileId(expansions);
+
+      if (pFactions.length < maxFactions) {
+        const backupFactions = shuffle(FACTIONS.map(f => f.id).filter(fId => !pFactions.includes(fId)));
+        while (pFactions.length < maxFactions && backupFactions.length > 0) {
+          pFactions.push(backupFactions.pop());
+        }
+      }
+
+      currentRedCount = pTiles.filter(t => isRedTile(t)).length;
+      if (currentRedCount < maxRed) {
+        const backupRed = shuffle(getActiveRedTiles(expansions).filter(t => !pTiles.includes(t)));
+        while (currentRedCount < maxRed && backupRed.length > 0) {
+          pTiles.push(backupRed.pop());
+          currentRedCount++;
+        }
+      }
+
+      currentBlueCount = pTiles.filter(t => !isRedTile(t)).length;
+      if (currentBlueCount < maxBlue) {
+        const backupBlue = shuffle(getActiveBlueTiles(expansions).filter(t => t !== mecatolId && !pTiles.includes(t)));
+        while (currentBlueCount < maxBlue && backupBlue.length > 0) {
+          pTiles.push(backupBlue.pop());
+          currentBlueCount++;
+        }
+      }
+
+      p.pickedItems.tiles = pTiles;
+      p.pickedItems.factions = pFactions;
+      p.draftPicksCount = pTiles.length + pFactions.length;
+
+      // Update seen items
+      pFactions.forEach(f => {
+        if (!p.seenItems.factions.includes(f)) p.seenItems.factions.push(f);
+      });
+      pTiles.forEach(t => {
+        if (!p.seenItems.tiles.includes(t)) p.seenItems.tiles.push(t);
+      });
+    });
+
+    // 3. Immediately transition to map building
+    delete room.draftState;
+    startMapBuilding(room);
 
     io.to(roomId).emit('room_state', room);
   });
@@ -815,6 +1009,9 @@ function advanceDraftRound(room) {
       }
     }
     player.draftPicksCount = (player.pickedItems.tiles?.length || 0) + (player.pickedItems.factions?.length || 0);
+
+    // Apply auto-pass for any players who cannot make a pick
+    applyAutoPasses(room);
 
     // Check if ALL players have submitted their pending selections for this round
     const allSubmitted = room.players.every(p => room.draftState.pendingSelections[p.slotId]);
@@ -1007,7 +1204,9 @@ function advanceDraftRound(room) {
   });
 });
 
-const PORT = process.env.PORT || 4000;
+// In AI Studio / Cloud Run, nginx proxy is on port 8080 and proxies to internal app port 3000.
+// We must bind to port 3000 (not 8080 or 4000).
+const PORT = process.env.PORT && process.env.PORT !== '8080' ? Number(process.env.PORT) : 3000;
 
 // Serve static tile images from client/public/tiles or root /tiles
 const clientTiles = path.resolve(__dirname, '../client/public/tiles');
@@ -1020,9 +1219,21 @@ const clientFactions = path.resolve(__dirname, '../client/public/factions');
 app.use('/factions', express.static(clientFactions));
 
 const clientDist = path.resolve(__dirname, '../client/dist');
+const indexPath = path.resolve(clientDist, 'index.html');
+
+// If client build doesn't exist yet, build it synchronously so index.html is available
+if (!fs.existsSync(indexPath)) {
+  try {
+    console.log('client/dist not found, building client...');
+    const { execSync } = await import('child_process');
+    execSync('npm run build:client', { stdio: 'inherit', cwd: path.resolve(__dirname, '..') });
+  } catch (err) {
+    console.error('Auto-build client failed:', err);
+  }
+}
+
 app.use(express.static(clientDist));
 app.get('*', (req, res) => {
-  const indexPath = path.resolve(clientDist, 'index.html');
   if (fs.existsSync(indexPath)) {
     res.sendFile(indexPath);
   } else {

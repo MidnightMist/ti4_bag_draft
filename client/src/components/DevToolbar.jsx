@@ -41,6 +41,11 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
     socket.emit('dev_autodraft_round', { roomId: room.id });
   };
 
+  const handleAutoDraftAll = () => {
+    if (!socket) return;
+    socket.emit('dev_autodraft_all', { roomId: room.id });
+  };
+
   const handleOpenPlayerTab = (slotIndex) => {
     const targetUrl = `${window.location.origin}/room/${room.id}?user=p${slotIndex + 1}`;
     window.open(targetUrl, `_blank`);
@@ -134,14 +139,24 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
             )}
 
             {room.status === 'drafting' && (
-              <button
-                id="dev-autodraft-btn"
-                onClick={handleAutoDraftRound}
-                style={actionBtnStyle('#7c3aed', '#6d28d9')}
-                title="Immediately auto-submits valid picks or passes for remaining players in this drafting round"
-              >
-                ⚡ Fast-Forward Round Draft Picks
-              </button>
+              <>
+                <button
+                  id="dev-autodraft-btn"
+                  onClick={handleAutoDraftRound}
+                  style={actionBtnStyle('#7c3aed', '#6d28d9')}
+                  title="Immediately auto-submits random valid picks or passes for remaining players in this drafting round"
+                >
+                  ⚡ Fast-Forward Round Draft Picks
+                </button>
+                <button
+                  id="dev-autodraft-all-btn"
+                  onClick={handleAutoDraftAll}
+                  style={actionBtnStyle('#059669', '#047857')}
+                  title="Randomly distributes all remaining draft elements among all players respecting quotas and finishes the draft"
+                >
+                  🎲 Distribute All Elements Randomly & Finish Draft
+                </button>
+              </>
             )}
 
             <button

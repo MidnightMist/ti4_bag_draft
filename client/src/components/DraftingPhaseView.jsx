@@ -359,107 +359,103 @@ export default function DraftingPhaseView({
                 </p>
               </div>
 
-              {hasSubmitted ? (
-                <div style={{ backgroundColor: '#064e3b', color: '#34d399', padding: '8px 16px', borderRadius: '8px', fontWeight: 'bold', fontSize: '13px', border: '1px solid #10b981' }}>
-                  ✓ Selection Submitted! Waiting for other players...
+              {isFull ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+                  <div style={{
+                    backgroundColor: '#064e3b',
+                    color: '#d1fae5',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    border: '1px solid #10b981',
+                    maxWidth: '480px',
+                    lineHeight: '1.4'
+                  }}>
+                    🎉 <strong>Full Hand Collected ({pickedTiles.length + pickedFactions.length}/{totalTargetPicks}):</strong> You have finished drafting all required items! You can inspect incoming hands while waiting for other players to finish.
+                  </div>
+                  <div style={{
+                    backgroundColor: '#064e3b',
+                    color: '#6ee7b7',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    border: '1px solid #059669',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span>✓ Auto-Passed</span>
+                    <span style={{ color: '#a7f3d0', fontWeight: 'normal' }}>• Waiting for active drafters to pick...</span>
+                  </div>
+                </div>
+              ) : mustPass ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
+                  <div style={{
+                    backgroundColor: '#1f2937',
+                    color: '#e5e7eb',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: '600',
+                    border: '1px solid #4b5563',
+                    maxWidth: '480px',
+                    lineHeight: '1.4'
+                  }}>
+                    ⏭️ <strong>No Valid Items to Take:</strong> All items in this hand exceed your quota limits ({blueCount}/{maxBlue} Blue, {redCount}/{maxRed} Red, {factionCount}/{maxFactions} Factions).
+                  </div>
+                  <div style={{
+                    backgroundColor: '#1e293b',
+                    color: '#93c5fd',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                    border: '1px solid #3b82f6',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px'
+                  }}>
+                    <span>✓ Auto-Passed</span>
+                    <span style={{ color: '#cbd5e1', fontWeight: 'normal' }}>• Hand will pass to next player once active players submit picks...</span>
+                  </div>
+                </div>
+              ) : hasSubmitted ? (
+                <div style={{
+                  backgroundColor: '#064e3b',
+                  color: '#34d399',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  fontWeight: 'bold',
+                  fontSize: '13px',
+                  border: '1px solid #10b981'
+                }}>
+                  ✓ Selection Submitted ({selectedItem ? (selectedItem.type === 'faction' ? 'Faction' : 'Tile') : 'Item'})! Waiting for other players...
                 </div>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-                  {isFull ? (
-                    <div style={{
-                      backgroundColor: '#064e3b',
-                      color: '#d1fae5',
-                      padding: '10px 16px',
+                <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <button
+                    id="confirm-draft-pick-btn"
+                    onClick={handleConfirmPick}
+                    disabled={!selectedItem}
+                    style={{
+                      backgroundColor: selectedItem ? '#2563eb' : '#27273a',
+                      color: selectedItem ? '#fff' : '#6b7280',
+                      border: selectedItem ? '2px solid #60a5fa' : '1px solid #374151',
                       borderRadius: '8px',
-                      fontSize: '13px',
-                      fontWeight: '600',
-                      border: '1px solid #10b981',
-                      maxWidth: '480px',
-                      lineHeight: '1.4'
-                    }}>
-                      🎉 <strong>Full Hand Collected ({pickedTiles.length + pickedFactions.length}/{totalTargetPicks}):</strong> You have finished drafting all required items! Click "Pass Hand" to pass this hand to players who are still drafting.
-                    </div>
-                  ) : mustPass ? (
-                    <div style={{
-                      backgroundColor: '#7f1d1d',
-                      color: '#fef2f2',
-                      padding: '8px 14px',
-                      borderRadius: '6px',
-                      fontSize: '12px',
-                      fontWeight: '600',
-                      border: '1px solid #ef4444',
-                      maxWidth: '480px',
-                      lineHeight: '1.4'
-                    }}>
-                      ⚠️ <strong>No Valid Items to Take:</strong> All available items in this hand exceed your quota limits ({blueCount}/{maxBlue} Blue, {redCount}/{maxRed} Red, {factionCount}/{maxFactions} Factions). Click "Pass Hand" to pass this hand to the next player.
-                    </div>
-                  ) : null}
-
-                  <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    {isFull ? (
-                      <button
-                        id="pass-draft-turn-btn"
-                        onClick={handlePassTurn}
-                        style={{
-                          backgroundColor: '#059669',
-                          color: '#fff',
-                          border: '2px solid #10b981',
-                          borderRadius: '8px',
-                          padding: '10px 22px',
-                          fontSize: '14px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          boxShadow: '0 0 16px rgba(16, 185, 129, 0.45)',
-                          transition: 'all 0.15s ease',
-                        }}
-                        title="You have reached your quota. Pass this hand to the next player."
-                      >
-                        ⏭️ Pass Hand (Draft Complete)
-                      </button>
-                    ) : mustPass ? (
-                      <button
-                        id="pass-draft-turn-btn"
-                        onClick={handlePassTurn}
-                        style={{
-                          backgroundColor: '#b91c1c',
-                          color: '#fff',
-                          border: '2px solid #ef4444',
-                          borderRadius: '8px',
-                          padding: '10px 22px',
-                          fontSize: '14px',
-                          fontWeight: 'bold',
-                          cursor: 'pointer',
-                          boxShadow: '0 0 16px rgba(239, 68, 68, 0.45)',
-                          transition: 'all 0.15s ease',
-                        }}
-                        title="All items in hand exceed your limits. Pass this hand to the next player without picking."
-                      >
-                        ⏭️ Pass Hand (Quota limits reached)
-                      </button>
-                    ) : (
-                      <button
-                        id="confirm-draft-pick-btn"
-                        onClick={handleConfirmPick}
-                        disabled={!selectedItem}
-                        style={{
-                          backgroundColor: selectedItem ? '#2563eb' : '#27273a',
-                          color: selectedItem ? '#fff' : '#6b7280',
-                          border: selectedItem ? '2px solid #60a5fa' : '1px solid #374151',
-                          borderRadius: '8px',
-                          padding: '10px 22px',
-                          fontSize: '14px',
-                          fontWeight: 'bold',
-                          cursor: selectedItem ? 'pointer' : 'not-allowed',
-                          boxShadow: selectedItem ? '0 0 16px rgba(37, 99, 235, 0.4)' : 'none',
-                          transition: 'all 0.15s ease',
-                        }}
-                      >
-                        {selectedItem
-                          ? `✓ Confirm Pick (${selectedItem.type === 'faction' ? 'Faction' : 'Tile'}) & Pass`
-                          : 'Select an Item to Pick'}
-                      </button>
-                    )}
-                  </div>
+                      padding: '10px 22px',
+                      fontSize: '14px',
+                      fontWeight: 'bold',
+                      cursor: selectedItem ? 'pointer' : 'not-allowed',
+                      boxShadow: selectedItem ? '0 0 16px rgba(37, 99, 235, 0.4)' : 'none',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    {selectedItem
+                      ? `✓ Confirm Pick (${selectedItem.type === 'faction' ? 'Faction' : 'Tile'}) & Pass`
+                      : 'Select an Item to Pick'}
+                  </button>
                 </div>
               )}
             </div>
@@ -472,8 +468,9 @@ export default function DraftingPhaseView({
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                  gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
                   gap: '16px',
+                  maxWidth: '100%',
                 }}
               >
                 {draftHand.factions.map(factionId => {
@@ -506,6 +503,7 @@ export default function DraftingPhaseView({
                         boxShadow: isSelected ? '0 0 20px rgba(59, 130, 246, 0.45)' : '0 2px 10px rgba(0,0,0,0.3)',
                         transition: 'all 0.15s ease',
                         position: 'relative',
+                        minWidth: 0,
                       }}
                     >
                       {!canTake && (
