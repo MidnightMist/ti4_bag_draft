@@ -55,6 +55,7 @@ export default function DraftingPhaseView({
   const maxBlue = playerCount === 3 ? 6 : 3;
   const maxRed = 2;
   const maxFactions = 2;
+  const totalTargetPicks = maxBlue + maxRed + maxFactions;
 
   const pickedTiles = pickedItems.tiles || [];
   const pickedFactions = pickedItems.factions || [];
@@ -65,12 +66,13 @@ export default function DraftingPhaseView({
   const hasBlueRoom = blueCount < maxBlue;
   const hasRedRoom = redCount < maxRed;
   const hasFactionRoom = factionCount < maxFactions;
+  const isFull = blueCount >= maxBlue && redCount >= maxRed && factionCount >= maxFactions;
 
-  // A player can take a tile/faction from hand ONLY IF they have room for that specific category
-  const canTakeAnyItemInHand = (draftHand.tiles || []).some(t => {
+  // A player can take a tile/faction from hand ONLY IF they have room for that specific category and hand is not complete
+  const canTakeAnyItemInHand = !isFull && (((draftHand.tiles || []).some(t => {
     const isRed = isRedTile(t);
     return isRed ? hasRedRoom : hasBlueRoom;
-  }) || ((draftHand.factions || []).length > 0 && hasFactionRoom);
+  })) || ((draftHand.factions || []).length > 0 && hasFactionRoom));
 
   // If player cannot take ANY item currently in hand because quotas are full or hand is empty, they MUST pass
   const mustPass = !canTakeAnyItemInHand;
@@ -82,7 +84,7 @@ export default function DraftingPhaseView({
       if (mustPass) {
         handlePassTurn();
       } else {
-        setActionFeedback('Please select an item from the current hand, or click "Pass Turn" to skip.');
+        setActionFeedback('Please select an item from the current hand to pick.');
       }
       return;
     }
@@ -115,6 +117,13 @@ export default function DraftingPhaseView({
   };
 
   const totalPlayersCount = room.players.length;
+  const completedPlayersCount = room.players.filter(p => {
+    const tiles = p.pickedItems?.tiles || [];
+    const factions = p.pickedItems?.factions || [];
+    const b = tiles.filter(t => !isRedTile(t)).length;
+    const r = tiles.filter(t => isRedTile(t)).length;
+    return b >= maxBlue && r >= maxRed && factions.length >= maxFactions;
+  }).length;
 
   return (
     <div id="drafting-phase-container" style={{ maxWidth: '1440px', margin: '0 auto', padding: '0 8px 32px 8px' }}>
@@ -123,7 +132,7 @@ export default function DraftingPhaseView({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
           <div>
             <span style={{ fontSize: '13px', color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-              Bag Draft — Active Round ({ (room.draftState?.roundIndex || 0) + 1 } / 7)
+              Bag Draft — Round { (room.draftState?.roundIndex || 0) + 1 }
             </span>
             <h2 style={{ margin: '4px 0 0 0', fontSize: '22px', color: '#f9fafb' }}>
               Room ID: <span style={{ color: '#60a5fa', fontFamily: 'monospace' }}>{room.id}</span>
@@ -144,7 +153,10 @@ export default function DraftingPhaseView({
           <span style={chipStyle}>👥 Players: {totalSlots}</span>
           <span style={chipStyle}>⚖️ Balanced Tiles</span>
           <span style={{ ...chipStyle, backgroundColor: '#1d4ed8', color: '#bfdbfe' }}>
-            🎒 Pick {blueCount}/{maxBlue} Blue, {redCount}/{maxRed} Red, {factionCount}/{maxFactions} Factions
+            🎒 Picked {blueCount}/{maxBlue} Blue, {redCount}/{maxRed} Red, {factionCount}/{maxFactions} Factions
+          </span>
+          <span style={{ ...chipStyle, backgroundColor: '#064e3b', color: '#a7f3d0' }}>
+            ✓ {completedPlayersCount} / {totalSlots} Players Complete
           </span>
           <span style={{ ...chipStyle, backgroundColor: '#1f2937', color: '#9ca3af' }}>
             Controlling: <strong style={{ color: '#f3f4f6' }}>{activePlayer.name}</strong>
@@ -353,7 +365,21 @@ export default function DraftingPhaseView({
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
-                  {mustPass && (
+                  {isFull ? (
+                    <div style={{
+                      backgroundColor: '#064e3b',
+                      color: '#d1fae5',
+                      padding: '10px 16px',
+                      borderRadius: '8px',
+                      fontSize: '13px',
+                      fontWeight: '600',
+                      border: '1px solid #10b981',
+                      maxWidth: '480px',
+                      lineHeight: '1.4'
+                    }}>
+                      🎉 <strong>Full Hand Collected ({pickedTiles.length + pickedFactions.length}/{totalTargetPicks}):</strong> You have finished drafting all required items! Click "Pass Hand" to pass this hand to players who are still drafting.
+                    </div>
+                  ) : mustPass ? (
                     <div style={{
                       backgroundColor: '#7f1d1d',
                       color: '#fef2f2',
@@ -365,54 +391,74 @@ export default function DraftingPhaseView({
                       maxWidth: '480px',
                       lineHeight: '1.4'
                     }}>
-                      ⚠️ <strong>No Valid Items to Take:</strong> All available items in this hand exceed your quota limits ({blueCount}/{maxBlue} Blue, {redCount}/{maxRed} Red, {factionCount}/{maxFactions} Factions). Click "Pass Turn" to pass this hand to the next player.
+                      ⚠️ <strong>No Valid Items to Take:</strong> All available items in this hand exceed your quota limits ({blueCount}/{maxBlue} Blue, {redCount}/{maxRed} Red, {factionCount}/{maxFactions} Factions). Click "Pass Hand" to pass this hand to the next player.
                     </div>
-                  )}
+                  ) : null}
 
                   <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
-                      id="pass-draft-turn-btn"
-                      onClick={handlePassTurn}
-                      style={{
-                        backgroundColor: mustPass ? '#b91c1c' : '#334155',
-                        color: '#fff',
-                        border: mustPass ? '2px solid #ef4444' : '1px solid #475569',
-                        borderRadius: '8px',
-                        padding: '10px 18px',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        cursor: 'pointer',
-                        boxShadow: mustPass ? '0 0 16px rgba(239, 68, 68, 0.45)' : 'none',
-                        transition: 'all 0.15s ease',
-                      }}
-                      title="Pass this hand to the next player clockwise without picking"
-                    >
-                      {mustPass ? '⏭️ Pass Turn (No valid items)' : '⏭️ Pass Turn'}
-                    </button>
-
-                    <button
-                      id="confirm-draft-pick-btn"
-                      onClick={handleConfirmPick}
-                      disabled={!selectedItem}
-                      style={{
-                        backgroundColor: selectedItem ? '#2563eb' : '#27273a',
-                        color: selectedItem ? '#fff' : '#6b7280',
-                        border: selectedItem ? '2px solid #60a5fa' : '1px solid #374151',
-                        borderRadius: '8px',
-                        padding: '10px 22px',
-                        fontSize: '14px',
-                        fontWeight: 'bold',
-                        cursor: selectedItem ? 'pointer' : 'not-allowed',
-                        boxShadow: selectedItem ? '0 0 16px rgba(37, 99, 235, 0.4)' : 'none',
-                        transition: 'all 0.15s ease',
-                      }}
-                    >
-                      {selectedItem
-                        ? `✓ Confirm Pick (${selectedItem.type === 'faction' ? 'Faction' : 'Tile'}) & Pass`
-                        : mustPass
-                        ? 'Cannot Pick (Quota Full)'
-                        : 'Select an Item to Pick'}
-                    </button>
+                    {isFull ? (
+                      <button
+                        id="pass-draft-turn-btn"
+                        onClick={handlePassTurn}
+                        style={{
+                          backgroundColor: '#059669',
+                          color: '#fff',
+                          border: '2px solid #10b981',
+                          borderRadius: '8px',
+                          padding: '10px 22px',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          boxShadow: '0 0 16px rgba(16, 185, 129, 0.45)',
+                          transition: 'all 0.15s ease',
+                        }}
+                        title="You have reached your quota. Pass this hand to the next player."
+                      >
+                        ⏭️ Pass Hand (Draft Complete)
+                      </button>
+                    ) : mustPass ? (
+                      <button
+                        id="pass-draft-turn-btn"
+                        onClick={handlePassTurn}
+                        style={{
+                          backgroundColor: '#b91c1c',
+                          color: '#fff',
+                          border: '2px solid #ef4444',
+                          borderRadius: '8px',
+                          padding: '10px 22px',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          cursor: 'pointer',
+                          boxShadow: '0 0 16px rgba(239, 68, 68, 0.45)',
+                          transition: 'all 0.15s ease',
+                        }}
+                        title="All items in hand exceed your limits. Pass this hand to the next player without picking."
+                      >
+                        ⏭️ Pass Hand (Quota limits reached)
+                      </button>
+                    ) : (
+                      <button
+                        id="confirm-draft-pick-btn"
+                        onClick={handleConfirmPick}
+                        disabled={!selectedItem}
+                        style={{
+                          backgroundColor: selectedItem ? '#2563eb' : '#27273a',
+                          color: selectedItem ? '#fff' : '#6b7280',
+                          border: selectedItem ? '2px solid #60a5fa' : '1px solid #374151',
+                          borderRadius: '8px',
+                          padding: '10px 22px',
+                          fontSize: '14px',
+                          fontWeight: 'bold',
+                          cursor: selectedItem ? 'pointer' : 'not-allowed',
+                          boxShadow: selectedItem ? '0 0 16px rgba(37, 99, 235, 0.4)' : 'none',
+                          transition: 'all 0.15s ease',
+                        }}
+                      >
+                        {selectedItem
+                          ? `✓ Confirm Pick (${selectedItem.type === 'faction' ? 'Faction' : 'Tile'}) & Pass`
+                          : 'Select an Item to Pick'}
+                      </button>
+                    )}
                   </div>
                 </div>
               )}
@@ -716,7 +762,7 @@ export default function DraftingPhaseView({
                 Players Draft Status
               </h4>
               <span style={{ fontSize: '11px', color: '#9ca3af' }}>
-                Round { (room.draftState?.roundIndex || 0) + 1 } / 7
+                Round { (room.draftState?.roundIndex || 0) + 1 }
               </span>
             </div>
 
@@ -726,6 +772,11 @@ export default function DraftingPhaseView({
                 const isViewing = p.slotId === selectedSlotId;
                 const picksMade = p.draftPicksCount || 0;
                 const submitted = Boolean(pendingSelections[p.slotId]);
+                const pTiles = p.pickedItems?.tiles || [];
+                const pFactions = p.pickedItems?.factions || [];
+                const pBlue = pTiles.filter(t => !isRedTile(t)).length;
+                const pRed = pTiles.filter(t => isRedTile(t)).length;
+                const isPlayerDone = pBlue >= maxBlue && pRed >= maxRed && pFactions.length >= maxFactions;
 
                 return (
                   <div
@@ -761,21 +812,27 @@ export default function DraftingPhaseView({
                     </div>
 
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: '11px', color: submitted ? '#34d399' : '#f59e0b' }}>
-                        {submitted ? '✓ Ready' : '⏳ Picking'}
-                      </span>
+                      {isPlayerDone ? (
+                        <span style={{ fontSize: '11px', color: '#34d399', fontWeight: 'bold' }}>
+                          ✓ Full
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '11px', color: submitted ? '#34d399' : '#f59e0b' }}>
+                          {submitted ? '✓ Ready' : '⏳ Picking'}
+                        </span>
+                      )}
                       <span
                         style={{
                           fontSize: '12px',
                           fontWeight: 'bold',
-                          color: '#38bdf8',
-                          backgroundColor: '#0f172a',
+                          color: isPlayerDone ? '#34d399' : '#38bdf8',
+                          backgroundColor: isPlayerDone ? '#064e3b' : '#0f172a',
                           padding: '2px 8px',
                           borderRadius: '4px',
-                          border: '1px solid #1e293b',
+                          border: `1px solid ${isPlayerDone ? '#10b981' : '#1e293b'}`,
                         }}
                       >
-                        {picksMade}/7
+                        {picksMade}/{totalTargetPicks}
                       </span>
                     </div>
                   </div>
