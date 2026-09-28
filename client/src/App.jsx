@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Link, useNavigate } from 'react
 import CreateRoom from './components/CreateRoom.jsx';
 import RoomView from './components/RoomView.jsx';
 import CreateDraftRoom from './components/CreateDraftRoom.jsx';
+import RulesGuideView from './components/RulesGuideView.jsx';
 import Footer from './components/Footer.jsx';
 
 function Home() {
@@ -32,6 +33,36 @@ function Home() {
             onMouseLeave={(e) => e.target.style.backgroundColor = '#059669'}
           >
             🎒 Bag Draft
+          </Link>
+        </div>
+
+        <div style={{ marginTop: '28px' }}>
+          <Link 
+            to="/rules" 
+            style={{
+              color: '#60a5fa',
+              textDecoration: 'none',
+              fontSize: '14px',
+              fontWeight: '500',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 14px',
+              borderRadius: '6px',
+              backgroundColor: '#111827',
+              border: '1px solid #1f2937',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = '#93c5fd';
+              e.currentTarget.style.borderColor = '#374151';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = '#60a5fa';
+              e.currentTarget.style.borderColor = '#1f2937';
+            }}
+          >
+            📖 Game Modes & Rules Guide
           </Link>
         </div>
       </div>
@@ -123,6 +154,7 @@ export default function App() {
             </PageLayout>
           } 
         />
+        <Route path="/rules" element={<RulesGuideView />} />
       </Routes>
     </Router>
   );
