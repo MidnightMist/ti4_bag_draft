@@ -42,3 +42,44 @@ export function getActiveFactions(expansions = { pok: true, thundersEdge: true }
     return true;
   });
 }
+
+/**
+ * Mapping between faction IDs and their respective home system tile numbers.
+ */
+export const FACTION_HOME_SYSTEM_TILES = {
+  sol: 1,
+  mentak: 2,
+  yin: 3,
+  muaat: 4,
+  arborec: 5,
+  l1z1x: 6,
+  winnu: 7,
+  nekro: 8,
+  naalu: 9,
+  letnev: 10,
+  saar: 11,
+  jolnar: 12,
+  sardakk: 13,
+  xxcha: 14,
+  yssaril: 15,
+  hacan: 16,
+  creuss: 17,
+  mahact: 52,
+  nomad: 53,
+  vuilraith: 54,
+  titans: 55,
+  empyrean: 56,
+  naazrokha: 57,
+  argent: 58,
+  lastbastion: 92,
+  ralnel: 93,
+  crimson: 94,
+  deepwrought: 95,
+  firmament: '96A',
+  keleres: 2, // fallback for Council Keleres
+};
+
+export function getFactionHomeTileId(factionId) {
+  if (!factionId) return null;
+  return FACTION_HOME_SYSTEM_TILES[factionId] || null;
+}

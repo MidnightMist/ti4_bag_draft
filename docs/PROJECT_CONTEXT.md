@@ -105,7 +105,12 @@
    - Since $60^\circ$ is a 6-fold symmetry, the rotated grid aligns onto the hex lattice, while hex polygons remain upright so all player names and numbers remain horizontal and legible.
 4. **Layout Optimization & 5-Tile Player Hand Panel:**
    - In `map_building` status, the layout splits into a compact left sidebar (room header, ready status, and player roster) and a large central game board.
-   - Directly underneath the hex map is `PlayerHandPanel` displaying the player's 5 tiles (3 Blue and 2 Red), ready for selection and placement during their turn.
+   - Directly underneath the hex map is `PlayerHandPanel` displaying the player's 5 tiles (3 Blue and 2 Red; 6 Blue in 3-player), ready for selection and placement during their turn.
+5. **Post-Draft Factions Display (`room.settings.gameMode === 'draft'`):**
+   - When entering map creation following the draft phase (and strictly NOT for random map generation), each player possesses their 2 drafted factions.
+   - While these factions play no active mechanical role during map building itself, they are prominently displayed in the side panel for the viewing player.
+   - **Privacy Enforcement:** A player can only view their own 2 drafted factions; other players' factions remain secret.
+   - **Enlarged Zoom Previews:** Faction cards feature both hover tooltip previews (`DraftItemZoomPreview`) and click modal inspection, rendering the full high-resolution faction sheet with race abilities, starting units, and technology.
 
 ### Phase 4: Draft / Placement Sequence (Snake Order):
 1. **Draft Order:**
@@ -122,7 +127,22 @@
      - Anomalies cannot be adjacent to other anomalies (unless no other legal placement exists).
      - Alpha wormholes cannot be adjacent to Alpha wormholes (unless forced).
      - Beta wormholes cannot be adjacent to Beta wormholes (unless forced).
-3. **Phase 5: Completed Map View & Perspective Rotation (`room.status === 'completed'`):**
+3. **Phase 4.5: Post-Map Faction Selection (`room.status === 'faction_selection'` for Draft Mode):**
+   - **Post-Draft Trigger:** When all system tiles on the board are placed (`currentTurnIndex >= totalTilesToPlace`), if the room was created via Bag Draft (`room.settings?.gameMode === 'draft'`), the room transitions to the Faction Selection step instead of immediately jumping to the completed screen. (Random Map rooms skip this step and advance straight to `completed`).
+   - **Screen Context:** This step occurs directly on the active map building screen (not on the final enlarged completed map view).
+   - **Speaker Priority & Sequential Turn Order:**
+     - The opportunity to choose a faction starts with the **Speaker** (`room.players[0]`, where `isSpeaker: true`).
+     - The active player reviews their 2 drafted factions in an interactive panel directly below the completed map, selects one with a radio card, and confirms by clicking **"Confirm Faction Choice"** (`select_faction` socket event).
+     - Upon confirmation, turn order advances sequentially from the Speaker to Player 2, Player 3, up to the last player (`0 -> 1 -> ... -> N-1`).
+   - **Faction Home System Tile Image Display:**
+     - Instead of displaying textual faction inscriptions or banners, when any player chooses their faction, that player's Home System hex immediately updates to display the official high-resolution illustration of that faction's Home System tile (`/tiles/ST_${homeTileId}.png`, mapped from `FACTION_HOME_SYSTEM_TILES`).
+     - Unchosen home systems (or in games without draft) continue displaying the standard emerald green home system polygon with player name.
+     - Home system tiles retain their distinct emerald border (`#34d399` / `#059669`), viewer glow, speaker crown 👑, and subtle player name indicator.
+   - **Faction Sheet Hover Hint (Unchanged):**
+     - Hovering over a Home System tile with a chosen faction displays the enlarged faction sheet preview from the draft (`DraftItemZoomPreview`), NOT an enlarged system tile. Clicking the home system opens the full modal faction sheet view.
+   - **Transition to Completed:** Once the last player confirms their faction choice (`currentTurnIndex >= room.players.length`), the room status transitions to `'completed'`.
+
+4. **Phase 5: Completed Map View & Perspective Rotation (`room.status === 'completed'`):**
    - **Expansive Proportional Viewport Display:** When all player hand tiles are placed, the application transitions to the completed map view. Hand tiles panel, placement action bar, and bottom guide captions are removed.
    - **Tight Hex ViewBox Framing:** In completed mode, SVG viewBox is dynamically cropped to `-348 -382 696 764` with `aspectRatio: '696 / 764'`, expanding the map so the top Home System tile sits right below the top header labels and the bottom Home System tile almost touches the bottom border of the board container.
    - **Cleaned Home Systems:** Mini red and blue tile count badges beside home systems are automatically hidden upon completion since all hand tiles are placed on the board.

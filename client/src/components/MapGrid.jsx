@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { getMecatolTileId, getCurrentActiveRing, ALL_37_HEXES, getActiveHexes, getPlayerForSeatIndex, getSeatIndexForPlayer } from '../data/tileData.js';
+import { FACTIONS, getFactionHomeTileId } from '../data/factionsData.js';
 
 // Geometry constants for flat-topped hexagonal grid
 // Radius enlarged from 54 to 62 for maximum board presence
@@ -53,6 +54,7 @@ function HexTile({
   strokeDasharray,
   isHomeSystem = false,
   playerName = '',
+  selectedFaction = null,
   isViewer = false,
   isSpeaker = false,
   onClick,
@@ -82,96 +84,202 @@ function HexTile({
         </clipPath>
       </defs>
 
-      {/* Home System Green Styling */}
+      {/* Home System Styling: Tile image if faction chosen, emerald green if not yet chosen */}
       {isHomeSystem ? (
         <g className="home-system-tile">
-          {/* Glow if viewer */}
-          {isViewer && (
-            <polygon
-              points={getFlatHexPoints(0, 0, R + 5)}
-              fill="none"
-              stroke="#34d399"
-              strokeWidth="3.5"
-              strokeOpacity="0.55"
-            />
-          )}
+          {showImage ? (
+            <g>
+              {/* Home system tile image */}
+              <image
+                href={`/tiles/ST_${tileId}.png`}
+                x={-R}
+                y={-H / 2}
+                width={2 * R}
+                height={H}
+                preserveAspectRatio="xMidYMid slice"
+                clipPath={`url(#${clipId})`}
+                onError={() => setImgFailed(true)}
+              />
 
-          {/* Base Green Polygon */}
-          <polygon
-            points={hexPoints}
-            fill="url(#green-home-system-grad)"
-            stroke={isViewer ? '#34d399' : '#059669'}
-            strokeWidth={isViewer ? 3 : 2}
-          />
+              {/* Viewer Glow */}
+              {isViewer && (
+                <polygon
+                  points={getFlatHexPoints(0, 0, R + 4)}
+                  fill="none"
+                  stroke="#34d399"
+                  strokeWidth="2.5"
+                  strokeOpacity="0.6"
+                />
+              )}
 
-          {/* Inner subtle border accent */}
-          <polygon
-            points={getFlatHexPoints(0, 0, R - 6)}
-            fill="none"
-            stroke="#10b981"
-            strokeWidth="1"
-            strokeOpacity="0.4"
-            strokeDasharray="4 3"
-          />
+              {/* Hex border */}
+              <polygon
+                points={hexPoints}
+                fill="none"
+                stroke={isViewer ? '#34d399' : '#059669'}
+                strokeWidth={isViewer ? 2.5 : 1.5}
+              />
 
-          {/* Speaker Crown if applicable */}
-          {isSpeaker && (
-            <text
-              x={0}
-              y={-24}
-              textAnchor="middle"
-              fontSize="16"
-              style={{ pointerEvents: 'none', userSelect: 'none' }}
-            >
-              👑
-            </text>
-          )}
+              {/* Speaker Crown if applicable */}
+              {isSpeaker && (
+                <text
+                  x={0}
+                  y={-22}
+                  textAnchor="middle"
+                  fontSize="16"
+                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                >
+                  👑
+                </text>
+              )}
 
-          {/* "YOU" badge if viewer */}
-          {isViewer && !isSpeaker && (
-            <g transform={`translate(0, -27)`}>
-              <rect x="-20" y="-9" width="40" height="17" rx="4" fill="#047857" stroke="#34d399" strokeWidth="1" />
-              <text x="0" y="3" textAnchor="middle" fill="#ecfdf5" fontSize="10" fontWeight="bold">
-                YOU
+              {/* "YOU" badge if viewer and not speaker */}
+              {isViewer && !isSpeaker && (
+                <g transform="translate(0, -25)">
+                  <rect x="-18" y="-8" width="36" height="15" rx="3" fill="#047857" stroke="#34d399" strokeWidth="1" />
+                  <text x="0" y="3" textAnchor="middle" fill="#ecfdf5" fontSize="9" fontWeight="bold">
+                    YOU
+                  </text>
+                </g>
+              )}
+
+              {/* Subtle Player Name Badge at bottom */}
+              <g transform="translate(0, 32)">
+                <rect
+                  x={-Math.max(28, Math.min(52, (playerName || label || '').length * 3.8 + 8))}
+                  y="-8"
+                  width={Math.max(56, Math.min(104, ((playerName || label || '').length * 3.8 + 8) * 2))}
+                  height="16"
+                  rx="4"
+                  fill="#070a13"
+                  fillOpacity="0.85"
+                  stroke={isViewer ? '#34d399' : '#059669'}
+                  strokeWidth="1"
+                />
+                <text
+                  x={0}
+                  y="3.5"
+                  textAnchor="middle"
+                  fill="#ffffff"
+                  fontSize="9.5"
+                  fontWeight="700"
+                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                >
+                  {playerName || label}
+                </text>
+              </g>
+
+              {/* High-contrast tile number overlay if enabled */}
+              {showTileNumber && tileId && (
+                <g style={{ pointerEvents: 'none', userSelect: 'none' }}>
+                  <text
+                    x={0}
+                    y={isSpeaker || isViewer ? 10 : 7}
+                    textAnchor="middle"
+                    fill="#ffffff"
+                    stroke="#000000"
+                    strokeWidth="4"
+                    strokeLinejoin="round"
+                    fontSize="13"
+                    fontWeight="800"
+                    style={{ paintOrder: 'stroke fill' }}
+                  >
+                    {tileId}
+                  </text>
+                </g>
+              )}
+            </g>
+          ) : (
+            <g>
+              {/* Glow if viewer */}
+              {isViewer && (
+                <polygon
+                  points={getFlatHexPoints(0, 0, R + 5)}
+                  fill="none"
+                  stroke="#34d399"
+                  strokeWidth="3.5"
+                  strokeOpacity="0.55"
+                />
+              )}
+
+              {/* Base Green Polygon */}
+              <polygon
+                points={hexPoints}
+                fill="url(#green-home-system-grad)"
+                stroke={isViewer ? '#34d399' : '#059669'}
+                strokeWidth={isViewer ? 3 : 2}
+              />
+
+              {/* Inner subtle border accent */}
+              <polygon
+                points={getFlatHexPoints(0, 0, R - 6)}
+                fill="none"
+                stroke="#10b981"
+                strokeWidth="1"
+                strokeOpacity="0.4"
+                strokeDasharray="4 3"
+              />
+
+              {/* Speaker Crown if applicable */}
+              {isSpeaker && (
+                <text
+                  x={0}
+                  y={-24}
+                  textAnchor="middle"
+                  fontSize="16"
+                  style={{ pointerEvents: 'none', userSelect: 'none' }}
+                >
+                  👑
+                </text>
+              )}
+
+              {/* "YOU" badge if viewer */}
+              {isViewer && !isSpeaker && (
+                <g transform="translate(0, -27)">
+                  <rect x="-20" y="-9" width="40" height="17" rx="4" fill="#047857" stroke="#34d399" strokeWidth="1" />
+                  <text x="0" y="3" textAnchor="middle" fill="#ecfdf5" fontSize="10" fontWeight="bold">
+                    YOU
+                  </text>
+                </g>
+              )}
+
+              {/* Player Name */}
+              <text
+                x={0}
+                y={0}
+                textAnchor="middle"
+                fill="#ffffff"
+                fontSize="14"
+                fontWeight="700"
+                style={{
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  textShadow: '0 2px 4px rgba(0,0,0,0.95)',
+                }}
+              >
+                {playerName || label}
+              </text>
+
+              {/* Subtitle "HOME SYSTEM" */}
+              <text
+                x={0}
+                y={19}
+                textAnchor="middle"
+                fill="#a7f3d0"
+                fontSize="10"
+                fontWeight="600"
+                letterSpacing="0.05em"
+                style={{
+                  pointerEvents: 'none',
+                  userSelect: 'none',
+                  textTransform: 'uppercase',
+                  textShadow: '0 1px 2px rgba(0,0,0,0.8)',
+                }}
+              >
+                Home System
               </text>
             </g>
           )}
-
-          {/* Player Name */}
-          <text
-            x={0}
-            y={0}
-            textAnchor="middle"
-            fill="#ffffff"
-            fontSize="14"
-            fontWeight="700"
-            style={{
-              pointerEvents: 'none',
-              userSelect: 'none',
-              textShadow: '0 2px 4px rgba(0,0,0,0.95)',
-            }}
-          >
-            {playerName || label}
-          </text>
-
-          {/* Subtitle "HOME SYSTEM" */}
-          <text
-            x={0}
-            y={19}
-            textAnchor="middle"
-            fill="#a7f3d0"
-            fontSize="10"
-            fontWeight="600"
-            letterSpacing="0.05em"
-            style={{
-              pointerEvents: 'none',
-              userSelect: 'none',
-              textTransform: 'uppercase',
-              textShadow: '0 1px 2px rgba(0,0,0,0.8)',
-            }}
-          >
-            Home System
-          </text>
         </g>
       ) : (
         <g>
@@ -351,6 +459,8 @@ export default function MapGrid({
   onSelectHex,
   isMyTurn,
   onHoverTile,
+  onHoverFaction,
+  onSelectFactionModal,
   perspectiveSeatIndex = null,
   isCompleted = false,
   showTileCounts = true,
@@ -663,18 +773,33 @@ export default function MapGrid({
                 const initialBlue = playerCount === 3 ? 6 : 3;
                 const blueCount = player.remainingBlue ?? player.hand?.blue?.length ?? initialBlue;
                 const redCount = player.remainingRed ?? player.hand?.red?.length ?? 2;
+                const faction = player.selectedFaction ? FACTIONS.find(f => f.id === player.selectedFaction) : null;
+                const homeTileId = faction ? getFactionHomeTileId(faction.id) : null;
 
                 return (
                   <g key={hex.id}>
                     <HexTile
                       cx={rx}
                       cy={ry}
+                      tileId={homeTileId}
                       isHomeSystem={true}
                       playerName={player.name}
+                      selectedFaction={faction}
                       isViewer={isViewer || isOrientedSeat}
                       isSpeaker={!!player.isSpeaker}
+                      cursor={faction ? 'pointer' : 'default'}
+                      onMouseEnter={() => {
+                        if (faction && onHoverFaction) onHoverFaction(faction.id);
+                      }}
+                      onMouseLeave={() => {
+                        if (faction && onHoverFaction) onHoverFaction(null);
+                      }}
+                      onClick={() => {
+                        if (faction && onSelectFactionModal) onSelectFactionModal(faction.id);
+                      }}
+                      showTileNumber={isCompleted && showTileNumbers && !!homeTileId}
                     />
-                    {showTileCounts && !isCompleted && (
+                    {showTileCounts && !isCompleted && !faction && (
                       <HomeSystemTileCountBadge
                         cx={rx}
                         cy={ry}

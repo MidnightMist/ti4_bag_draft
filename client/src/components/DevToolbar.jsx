@@ -46,6 +46,11 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
     socket.emit('dev_autodraft_all', { roomId: room.id });
   };
 
+  const handleAutoSelectFactions = () => {
+    if (!socket) return;
+    socket.emit('dev_auto_select_factions', { roomId: room.id });
+  };
+
   const handleOpenPlayerTab = (slotIndex) => {
     const targetUrl = `${window.location.origin}/room/${room.id}?user=p${slotIndex + 1}`;
     window.open(targetUrl, `_blank`);
@@ -157,6 +162,17 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
                   🎲 Distribute All Elements Randomly & Finish Draft
                 </button>
               </>
+            )}
+
+            {room.status === 'faction_selection' && (
+              <button
+                id="dev-autoselect-factions-btn"
+                onClick={handleAutoSelectFactions}
+                style={actionBtnStyle('#059669', '#047857')}
+                title="Immediately auto-selects first drafted faction for all players and completes the map"
+              >
+                🏛️ Auto-Select Factions & Finish
+              </button>
             )}
 
             <button

@@ -74,9 +74,14 @@ function startMapBuilding(room) {
       p.hand = { blue, red };
       p.remainingBlue = blue.length;
       p.remainingRed = red.length;
+      p.draftedFactions = [...(p.pickedItems?.factions || [])];
+      p.selectedFaction = null;
     });
   } else {
     dealPlayerHands(room);
+    room.players.forEach(p => {
+      p.selectedFaction = null;
+    });
   }
 }
 
@@ -1122,7 +1127,14 @@ io.on('connection', (socket) => {
     const draftableHexes = activeHexes.filter(h => h.type !== 'center' && h.type !== 'home_system' && !h.isHyperlane);
     const totalTilesToPlace = draftableHexes.length;
     if (room.mapState.currentTurnIndex >= totalTilesToPlace) {
-      room.status = 'completed';
+      if (room.settings?.gameMode === 'draft') {
+        room.status = 'faction_selection';
+        room.factionSelection = {
+          currentTurnIndex: 0
+        };
+      } else {
+        room.status = 'completed';
+      }
     }
 
     io.to(roomId).emit('room_state', room);
@@ -1167,8 +1179,71 @@ io.on('connection', (socket) => {
 
     const draftableHexes = activeHexes.filter(h => h.type !== 'center' && h.type !== 'home_system' && !h.isHyperlane);
     room.mapState.currentTurnIndex = draftableHexes.length;
-    room.status = 'completed';
+    if (room.settings?.gameMode === 'draft') {
+      room.status = 'faction_selection';
+      room.factionSelection = {
+        currentTurnIndex: 0
+      };
+    } else {
+      room.status = 'completed';
+    }
 
+    io.to(roomId).emit('room_state', room);
+  });
+
+  // Post-Draft Faction Selection: Active player chooses 1 of their 2 drafted factions
+  socket.on('select_faction', ({ roomId, slotId, factionId }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.status !== 'faction_selection') {
+      socket.emit('room_error', { message: 'Room not in faction selection phase' });
+      return;
+    }
+
+    const currentTurnIndex = room.factionSelection?.currentTurnIndex || 0;
+    const currentTurnPlayer = room.players[currentTurnIndex];
+    if (!currentTurnPlayer || currentTurnPlayer.slotId !== slotId) {
+      socket.emit('room_error', { message: 'It is not your turn to choose a faction!' });
+      return;
+    }
+
+    const player = room.players.find(p => p.slotId === slotId);
+    if (!player) {
+      socket.emit('room_error', { message: 'Player not found' });
+      return;
+    }
+
+    const draftedFactions = player.draftedFactions || player.pickedItems?.factions || [];
+    if (!draftedFactions.includes(factionId)) {
+      socket.emit('room_error', { message: 'Chosen faction was not in your drafted factions' });
+      return;
+    }
+
+    // Set selected faction and advance to next player
+    player.selectedFaction = factionId;
+    room.factionSelection.currentTurnIndex = currentTurnIndex + 1;
+
+    // If all players have chosen their faction, transition to completed
+    if (room.factionSelection.currentTurnIndex >= room.players.length) {
+      room.status = 'completed';
+    }
+
+    io.to(roomId).emit('room_state', room);
+  });
+
+  // DEV TOOLBAR: Auto-select factions for all players and complete
+  socket.on('dev_auto_select_factions', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.status !== 'faction_selection') return;
+
+    room.players.forEach(p => {
+      if (!p.selectedFaction) {
+        const factions = p.draftedFactions || p.pickedItems?.factions || [];
+        p.selectedFaction = factions[0] || null;
+      }
+    });
+
+    room.factionSelection.currentTurnIndex = room.players.length;
+    room.status = 'completed';
     io.to(roomId).emit('room_state', room);
   });
 
@@ -1184,9 +1259,12 @@ io.on('connection', (socket) => {
       p.claimedAt = null;
       p.isSpeaker = false;
       p.hand = null;
+      p.draftedFactions = [];
+      p.selectedFaction = null;
       p.remainingBlue = playerCount === 3 ? 6 : 3;
       p.remainingRed = 2;
     });
+    room.factionSelection = null;
     room.players.sort((a, b) => a.slotId - b.slotId);
     dealPlayerHands(room);
     const resetPlacedTiles = playerCount === 8 ? { ...EIGHT_PLAYER_HYPERLANES } : playerCount === 7 ? { ...SEVEN_PLAYER_HYPERLANES } : playerCount === 5 ? { ...FIVE_PLAYER_HYPERLANES } : playerCount === 4 ? { ...FOUR_PLAYER_HYPERLANES } : {};

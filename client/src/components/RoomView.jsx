@@ -6,8 +6,10 @@ import MapGrid from './MapGrid.jsx';
 import DevToolbar from './DevToolbar.jsx';
 import PlayerHandPanel from './PlayerHandPanel.jsx';
 import TileZoomPreview from './TileZoomPreview.jsx';
+import DraftItemZoomPreview from './DraftItemZoomPreview.jsx';
 import FactionBanView from './FactionBanView.jsx';
 import DraftingPhaseView from './DraftingPhaseView.jsx';
+import { FACTIONS } from '../data/factionsData.js';
 import { getPlayerForTurn, validatePlacement, getCurrentActiveRing, getActiveHexes, getSeatIndexForPlayer } from '../data/tileData.js';
 
 export default function RoomView() {
@@ -29,6 +31,9 @@ export default function RoomView() {
   const [showTileNumbers, setShowTileNumbers] = useState(true);
   const [selectedBanFactionId, setSelectedBanFactionId] = useState(null);
   const [banningViewingSlotId, setBanningViewingSlotId] = useState(null);
+  const [hoveredFactionId, setHoveredFactionId] = useState(null);
+  const [selectedFactionModal, setSelectedFactionModal] = useState(null);
+  const [pendingSelectedFactionId, setPendingSelectedFactionId] = useState(null);
 
   // Clear draft previews whenever turn advances or room status transitions
   useEffect(() => {
@@ -163,8 +168,29 @@ export default function RoomView() {
   const isLobby = room.status === 'lobby';
   const isFactionBan = room.status === 'faction_ban';
   const isDrafting = room.status === 'drafting';
+  const isFactionSelection = room.status === 'faction_selection';
   const isCompleted = room.status === 'completed';
+  const isDraftMode = room.settings?.gameMode === 'draft';
+  const myDraftedFactions = myClaimedSlot ? (myClaimedSlot.draftedFactions || myClaimedSlot.pickedItems?.factions || []) : [];
   const speaker = room.players.find((p) => p.isSpeaker);
+
+  // Faction Selection step calculation (post-draft)
+  const factionTurnIndex = room.factionSelection?.currentTurnIndex || 0;
+  const currentFactionPlayer = isFactionSelection ? room.players[factionTurnIndex] : null;
+  const isMyFactionTurn = Boolean(
+    isFactionSelection && myClaimedSlot && currentFactionPlayer && currentFactionPlayer.slotId === myClaimedSlot.slotId
+  );
+
+  const handleConfirmFactionSelection = () => {
+    if (!socket || !myClaimedSlot || !pendingSelectedFactionId) return;
+    setActionError(null);
+    socket.emit('select_faction', {
+      roomId,
+      slotId: myClaimedSlot.slotId,
+      factionId: pendingSelectedFactionId,
+    });
+    setPendingSelectedFactionId(null);
+  };
 
   // Perspective calculation: default to viewer's claimed seat, or seat 0 (Player 1 in 6p, Overview in 5p/4p)
   const defaultPerspectiveSeat = myClaimedSlot
@@ -602,6 +628,32 @@ export default function RoomView() {
                   />
                 </label>
               </div>
+            ) : isFactionSelection ? (
+              <div
+                id="compact-status-card"
+                style={{
+                  backgroundColor: isMyFactionTurn ? 'rgba(30, 58, 138, 0.5)' : 'rgba(31, 41, 55, 0.7)',
+                  border: isMyFactionTurn ? '1.5px solid #3b82f6' : '1px solid #4b5563',
+                  borderRadius: '12px',
+                  padding: '14px',
+                  boxShadow: isMyFactionTurn ? '0 0 16px rgba(59, 130, 246, 0.35)' : '0 4px 16px rgba(0,0,0,0.25)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '18px' }}>🏛️</span>
+                  <div>
+                    <div style={{ color: isMyFactionTurn ? '#60a5fa' : '#fbbf24', fontWeight: '700', fontSize: '13px' }}>
+                      Step: Faction Selection
+                    </div>
+                    <div style={{ color: '#e5e7eb', fontSize: '12px', marginTop: '2px' }}>
+                      Speaker: <strong style={{ color: '#fbbf24' }}>👑 {speaker?.name || 'Player 1'}</strong>
+                    </div>
+                    <div style={{ color: isMyFactionTurn ? '#93c5fd' : '#d1d5db', fontSize: '12px', marginTop: '4px' }}>
+                      Turn: <strong>{currentFactionPlayer?.name || 'Player'}</strong> {isMyFactionTurn ? '(Your Turn!)' : ''}
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div
                 id="compact-status-card"
@@ -626,6 +678,96 @@ export default function RoomView() {
                       Turn: <strong>{currentTurnPlayer?.name || 'Player 1'}</strong> {isMyTurn ? '(Your Turn!)' : ''}
                     </div>
                   </div>
+                </div>
+              </div>
+            )}
+
+            {/* Block: My Drafted Factions (Only in draft mode and private to the viewing player) */}
+            {isDraftMode && myClaimedSlot && myDraftedFactions.length > 0 && (
+              <div
+                id="my-drafted-factions-card"
+                style={{
+                  backgroundColor: '#161625',
+                  border: '1px solid #2d2d44',
+                  borderRadius: '14px',
+                  padding: '14px 16px',
+                  boxShadow: '0 4px 16px rgba(0,0,0,0.35)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '15px' }}>🏛️</span>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#f3f4f6', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Your Factions
+                    </span>
+                  </div>
+                  <span style={{ fontSize: '10px', color: '#c4b5fd', backgroundColor: '#2e1065', border: '1px solid #7c3aed', padding: '2px 7px', borderRadius: '4px', fontWeight: '600' }}>
+                    Secret • {myDraftedFactions.length} {myDraftedFactions.length === 1 ? 'Faction' : 'Factions'}
+                  </span>
+                </div>
+
+                <div style={{ fontSize: '11px', color: '#9ca3af', marginBottom: '10px' }}>
+                  Drafted in pre-game draft. Hover or click to zoom sheet.
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {myDraftedFactions.map((fId) => {
+                    const faction = FACTIONS.find(f => f.id === fId);
+                    if (!faction) return null;
+                    const isHovered = hoveredFactionId === fId;
+
+                    return (
+                      <div
+                        key={fId}
+                        id={`my-drafted-faction-${fId}`}
+                        onMouseEnter={() => setHoveredFactionId(fId)}
+                        onMouseLeave={() => setHoveredFactionId(null)}
+                        onClick={() => setSelectedFactionModal(fId)}
+                        style={{
+                          backgroundColor: isHovered ? '#1e293b' : '#11111d',
+                          border: `1.5px solid ${isHovered ? '#3b82f6' : '#28283e'}`,
+                          borderRadius: '10px',
+                          overflow: 'hidden',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          boxShadow: isHovered ? '0 0 16px rgba(59, 130, 246, 0.4)' : '0 2px 8px rgba(0,0,0,0.3)',
+                          transform: isHovered ? 'translateY(-2px)' : 'none',
+                        }}
+                        title="Click or hover to zoom full faction sheet"
+                      >
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          padding: '7px 10px',
+                          backgroundColor: isHovered ? '#1e3a8a' : '#181829',
+                          borderBottom: '1px solid #28283e',
+                        }}>
+                          <span style={{ fontSize: '12px', fontWeight: '700', color: '#f9fafb' }}>
+                            {faction.name}
+                          </span>
+                          <span style={{
+                            fontSize: '10px',
+                            color: isHovered ? '#bfdbfe' : '#9ca3af',
+                            backgroundColor: isHovered ? '#2563eb' : '#242436',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontWeight: '600'
+                          }}>
+                            🔍 {isHovered ? 'Zooming' : 'Zoom'}
+                          </span>
+                        </div>
+
+                        <div style={{ position: 'relative', width: '100%', aspectRatio: '2800 / 1625', backgroundColor: '#080811' }}>
+                          <img
+                            src={`/factions/${encodeURIComponent(faction.filename)}`}
+                            alt={faction.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -946,6 +1088,96 @@ export default function RoomView() {
               </div>
             )}
 
+            {/* Faction Selection Turn Banner */}
+            {isFactionSelection && (
+              <div
+                id="faction-selection-header-banner"
+                style={{
+                  marginBottom: '14px',
+                  width: '100%',
+                  maxWidth: totalSlots === 7 ? '840px' : '920px',
+                  backgroundColor: isMyFactionTurn ? '#172554' : '#111827',
+                  border: isMyFactionTurn ? '2px solid #3b82f6' : '1px solid #374151',
+                  borderRadius: '12px',
+                  padding: '12px 18px',
+                  boxShadow: isMyFactionTurn ? '0 0 20px rgba(59, 130, 246, 0.35)' : '0 4px 14px rgba(0,0,0,0.3)',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '20px' }}>🏛️</span>
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span style={{ fontSize: '14px', fontWeight: '800', color: '#f3f4f6' }}>
+                          Map Built! Faction Selection Step
+                        </span>
+                        {currentFactionPlayer?.isSpeaker && (
+                          <span style={{ fontSize: '10px', color: '#fbbf24', backgroundColor: '#78350f', border: '1px solid #f59e0b', padding: '1px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                            👑 Speaker First
+                          </span>
+                        )}
+                      </div>
+                      <div style={{ fontSize: '12px', color: isMyFactionTurn ? '#bfdbfe' : '#9ca3af', marginTop: '2px' }}>
+                        {isMyFactionTurn ? (
+                          <strong style={{ color: '#60a5fa' }}>Your Turn! Choose one of your 2 factions below.</strong>
+                        ) : (
+                          <span>
+                            Turn: <strong style={{ color: '#fbbf24' }}>{currentFactionPlayer?.name || 'Player'}</strong> {currentFactionPlayer?.isSpeaker ? '(👑 Speaker)' : ''} is selecting a faction...
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <span style={{ fontSize: '11px', color: '#9ca3af' }}>Progress:</span>
+                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#34d399', backgroundColor: '#064e3b', padding: '2px 8px', borderRadius: '4px' }}>
+                      {room.players.filter(p => !!p.selectedFaction).length} / {room.players.length} Factions Chosen
+                    </span>
+                  </div>
+                </div>
+
+                {/* Turn Order Chips */}
+                <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
+                  {room.players.map((p, idx) => {
+                    const isTurn = (room.factionSelection?.currentTurnIndex || 0) === idx;
+                    const hasPicked = Boolean(p.selectedFaction);
+                    const faction = p.selectedFaction ? FACTIONS.find(f => f.id === p.selectedFaction) : null;
+
+                    return (
+                      <div
+                        key={p.slotId}
+                        style={{
+                          padding: '4px 10px',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          backgroundColor: isTurn ? '#1d4ed8' : hasPicked ? '#064e3b' : '#1f2937',
+                          border: isTurn ? '1.5px solid #60a5fa' : hasPicked ? '1px solid #059669' : '1px solid #374151',
+                          color: '#fff',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: '5px',
+                        }}
+                      >
+                        <span>{p.isSpeaker ? '👑' : `${idx + 1}.`}</span>
+                        <span style={{ fontWeight: isTurn ? '700' : '500' }}>{p.name}</span>
+                        {hasPicked && (
+                          <span style={{ color: '#a7f3d0', fontWeight: '700' }}>
+                            ({faction ? faction.name : 'Selected'}) ✓
+                          </span>
+                        )}
+                        {isTurn && (
+                          <span style={{ color: '#fef08a', fontWeight: '700' }}>
+                            [Picking...]
+                          </span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <MapGrid
               room={room}
               mySlot={myClaimedSlot}
@@ -954,16 +1186,18 @@ export default function RoomView() {
               onSelectHex={handleSelectHex}
               isMyTurn={isMyTurn}
               onHoverTile={setHoveredTileId}
+              onHoverFaction={setHoveredFactionId}
+              onSelectFactionModal={setSelectedFactionModal}
               perspectiveSeatIndex={activePerspectiveSeat}
               isCompleted={isCompleted}
-              showTileCounts={!isCompleted}
+              showTileCounts={!isCompleted && !isFactionSelection}
               showTileNumbers={showTileNumbers}
               isFullscreen={isFullscreen}
               onToggleFullscreen={() => setIsFullscreen(!isFullscreen)}
             />
 
             {/* Placement Action Bar with Accept button (Draft mode) */}
-            {!isCompleted && selectedTileId && isMyTurn && (
+            {!isCompleted && !isFactionSelection && selectedTileId && isMyTurn && (
               <div
                 style={{
                   marginTop: '14px',
@@ -1037,8 +1271,192 @@ export default function RoomView() {
               </div>
             )}
 
+            {/* Faction Selection Action Panel for active choosing player */}
+            {isFactionSelection && isMyFactionTurn && (
+              <div
+                id="choose-faction-action-panel"
+                style={{
+                  marginTop: '16px',
+                  width: '100%',
+                  maxWidth: totalSlots === 7 ? '840px' : '920px',
+                  backgroundColor: '#111827',
+                  border: '2px solid #3b82f6',
+                  borderRadius: '16px',
+                  padding: '20px 24px',
+                  boxShadow: '0 8px 32px rgba(59, 130, 246, 0.3)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '16px',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '20px' }}>🏛️</span>
+                      <h3 style={{ margin: 0, fontSize: '17px', color: '#f3f4f6', fontWeight: '800' }}>
+                        Choose Your Faction
+                      </h3>
+                      {myClaimedSlot.isSpeaker && (
+                        <span style={{ fontSize: '11px', color: '#fbbf24', backgroundColor: '#78350f', border: '1px solid #f59e0b', padding: '2px 8px', borderRadius: '4px', fontWeight: '700' }}>
+                          👑 Speaker Pick
+                        </span>
+                      )}
+                    </div>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '13px', color: '#9ca3af' }}>
+                      Select one of your 2 drafted factions below, then click <strong>Confirm Faction Choice</strong>.
+                    </p>
+                  </div>
+
+                  <button
+                    id="confirm-faction-selection-btn"
+                    disabled={!pendingSelectedFactionId}
+                    onClick={handleConfirmFactionSelection}
+                    style={{
+                      padding: '12px 28px',
+                      fontSize: '14px',
+                      fontWeight: '800',
+                      borderRadius: '8px',
+                      border: 'none',
+                      cursor: pendingSelectedFactionId ? 'pointer' : 'not-allowed',
+                      backgroundColor: pendingSelectedFactionId ? '#059669' : '#374151',
+                      color: pendingSelectedFactionId ? '#ffffff' : '#9ca3af',
+                      boxShadow: pendingSelectedFactionId ? '0 0 16px rgba(5, 150, 105, 0.5)' : 'none',
+                      transition: 'all 0.15s ease',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                    }}
+                  >
+                    <span>✓</span>
+                    <span>Confirm Faction Choice</span>
+                  </button>
+                </div>
+
+                {/* 2 Drafted Faction Choice Cards */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+                  {myDraftedFactions.map((fId) => {
+                    const faction = FACTIONS.find(f => f.id === fId);
+                    if (!faction) return null;
+                    const isSelected = pendingSelectedFactionId === fId;
+                    const isHovered = hoveredFactionId === fId;
+
+                    return (
+                      <div
+                        key={fId}
+                        id={`choose-faction-card-${fId}`}
+                        onClick={() => setPendingSelectedFactionId(fId)}
+                        onMouseEnter={() => setHoveredFactionId(fId)}
+                        onMouseLeave={() => setHoveredFactionId(null)}
+                        style={{
+                          backgroundColor: isSelected ? '#1e3a8a' : '#1f2937',
+                          border: isSelected ? '2px solid #60a5fa' : '2px solid #374151',
+                          borderRadius: '12px',
+                          padding: '14px',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s ease',
+                          boxShadow: isSelected ? '0 0 20px rgba(59, 130, 246, 0.5)' : '0 2px 8px rgba(0,0,0,0.3)',
+                          transform: isSelected ? 'scale(1.02)' : isHovered ? 'translateY(-2px)' : 'none',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <input
+                              type="radio"
+                              name="faction_selection"
+                              checked={isSelected}
+                              onChange={() => setPendingSelectedFactionId(fId)}
+                              style={{ width: '18px', height: '18px', accentColor: '#2563eb', cursor: 'pointer' }}
+                            />
+                            <span style={{ fontSize: '15px', fontWeight: '800', color: isSelected ? '#ffffff' : '#e5e7eb' }}>
+                              {faction.name}
+                            </span>
+                          </div>
+                          <span style={{
+                            fontSize: '11px',
+                            padding: '2px 8px',
+                            borderRadius: '4px',
+                            backgroundColor: isSelected ? '#2563eb' : '#374151',
+                            color: isSelected ? '#ffffff' : '#9ca3af',
+                            fontWeight: '600'
+                          }}>
+                            {isSelected ? '✓ Selected' : 'Click to Select'}
+                          </span>
+                        </div>
+
+                        <div
+                          style={{
+                            position: 'relative',
+                            width: '100%',
+                            aspectRatio: '2800 / 1625',
+                            backgroundColor: '#07070d',
+                            borderRadius: '8px',
+                            overflow: 'hidden',
+                            border: '1px solid #374151',
+                          }}
+                        >
+                          <img
+                            src={`/factions/${encodeURIComponent(faction.filename)}`}
+                            alt={faction.name}
+                            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Waiting Notice for other players during faction selection */}
+            {isFactionSelection && !isMyFactionTurn && (
+              <div
+                id="waiting-faction-selection-panel"
+                style={{
+                  marginTop: '16px',
+                  width: '100%',
+                  maxWidth: totalSlots === 7 ? '840px' : '920px',
+                  backgroundColor: '#111827',
+                  border: '1px solid #374151',
+                  borderRadius: '12px',
+                  padding: '16px 20px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span style={{ fontSize: '24px' }}>⏳</span>
+                  <div>
+                    <div style={{ color: '#fbbf24', fontWeight: '700', fontSize: '14px' }}>
+                      Waiting for {currentFactionPlayer?.name} {currentFactionPlayer?.isSpeaker ? '👑 (Speaker)' : ''} to choose a faction
+                    </div>
+                    <div style={{ color: '#9ca3af', fontSize: '12px', marginTop: '2px' }}>
+                      {myClaimedSlot?.selectedFaction ? (
+                        <span style={{ color: '#34d399' }}>
+                          ✓ You have chosen: {FACTIONS.find(f => f.id === myClaimedSlot.selectedFaction)?.name}
+                        </span>
+                      ) : (
+                        <span>
+                          Your turn will arrive once preceding players in turn order finish choosing.
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '12px', color: '#9ca3af' }}>Completed picks:</span>
+                  <span style={{ fontSize: '13px', fontWeight: '700', color: '#34d399', backgroundColor: '#064e3b', padding: '3px 8px', borderRadius: '4px' }}>
+                    {room.players.filter(p => !!p.selectedFaction).length} / {room.players.length}
+                  </span>
+                </div>
+              </div>
+            )}
+
             {/* Row of 5 Tiles at the bottom (Draft mode) */}
-            {!isCompleted && myClaimedSlot && (
+            {!isCompleted && !isFactionSelection && myClaimedSlot && (
               <PlayerHandPanel
                 player={myClaimedSlot}
                 activeTileId={selectedTileId}
@@ -1052,6 +1470,87 @@ export default function RoomView() {
 
       {/* Hover Zoom Preview Hint */}
       <TileZoomPreview tileId={hoveredTileId} />
+
+      {/* Hover Zoom Preview Hint for Drafted Factions */}
+      <DraftItemZoomPreview
+        hoveredItem={hoveredFactionId && !selectedFactionModal ? { type: 'faction', factionId: hoveredFactionId } : null}
+      />
+
+      {/* Click Modal for Full Faction Sheet Inspection */}
+      {selectedFactionModal && (() => {
+        const modalFaction = FACTIONS.find(f => f.id === selectedFactionModal);
+        if (!modalFaction) return null;
+        return (
+          <div
+            id="faction-detail-modal-overlay"
+            onClick={() => setSelectedFactionModal(null)}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              backgroundColor: 'rgba(0, 0, 0, 0.82)',
+              backdropFilter: 'blur(5px)',
+              zIndex: 1200,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px',
+              animation: 'fadeIn 0.15s ease-out',
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                width: 'min(940px, 95vw)',
+                backgroundColor: '#0f0f1a',
+                border: '2px solid #3b82f6',
+                borderRadius: '16px',
+                padding: '20px 24px',
+                boxShadow: '0 24px 60px rgba(0, 0, 0, 0.95), 0 0 30px rgba(59, 130, 246, 0.3)',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                position: 'relative',
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: '14px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '20px' }}>🏛️</span>
+                  <span style={{ fontSize: '16px', fontWeight: '800', color: '#f3f4f6', letterSpacing: '0.04em' }}>
+                    {modalFaction.name}
+                  </span>
+                  <span style={{ fontSize: '11px', padding: '2px 8px', borderRadius: '4px', backgroundColor: '#1e293b', color: '#60a5fa', border: '1px solid #3b82f6', fontWeight: '600' }}>
+                    {modalFaction.expansion === 'pok' ? 'Prophecy of Kings' : modalFaction.expansion === 'thundersEdge' ? "Thunder's Edge" : 'Base Game'}
+                  </span>
+                </div>
+                <button
+                  id="close-faction-modal-btn"
+                  onClick={() => setSelectedFactionModal(null)}
+                  style={{
+                    backgroundColor: '#27273a',
+                    border: '1px solid #3f3f58',
+                    color: '#e5e7eb',
+                    borderRadius: '8px',
+                    padding: '6px 14px',
+                    fontSize: '13px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                  }}
+                >
+                  ✕ Close
+                </button>
+              </div>
+
+              <div style={{ width: '100%', aspectRatio: '2800 / 1625', borderRadius: '10px', overflow: 'hidden', backgroundColor: '#07070d', border: '1px solid #28283c' }}>
+                <img
+                  src={`/factions/${encodeURIComponent(modalFaction.filename)}`}
+                  alt={modalFaction.name}
+                  style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
