@@ -35,7 +35,7 @@ function Home() {
           </Link>
         </div>
       </div>
-      <Footer />
+      <Footer showDonate={true} />
     </div>
   );
 }
@@ -64,7 +64,7 @@ function PageLayout({ title, children }) {
         </div>
         {children}
       </div>
-      <Footer />
+      <Footer showDonate={false} />
     </div>
   );
 }
