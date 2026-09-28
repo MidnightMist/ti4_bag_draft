@@ -36,6 +36,11 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
     socket.emit('dev_autoban_room', { roomId: room.id });
   };
 
+  const handleAutoDraftRound = () => {
+    if (!socket) return;
+    socket.emit('dev_autodraft_round', { roomId: room.id });
+  };
+
   const handleOpenPlayerTab = (slotIndex) => {
     const targetUrl = `${window.location.origin}/room/${room.id}?user=p${slotIndex + 1}`;
     window.open(targetUrl, `_blank`);
@@ -125,6 +130,17 @@ export default function DevToolbar({ room, currentUserId, onSwitchUser, socket }
                 title="Immediately submits default bans for all remaining players to enter Drafting phase"
               >
                 ⚡ Fast-Forward Bans & Start Draft
+              </button>
+            )}
+
+            {room.status === 'drafting' && (
+              <button
+                id="dev-autodraft-btn"
+                onClick={handleAutoDraftRound}
+                style={actionBtnStyle('#7c3aed', '#6d28d9')}
+                title="Immediately auto-submits valid picks or passes for remaining players in this drafting round"
+              >
+                ⚡ Fast-Forward Round Draft Picks
               </button>
             )}
 

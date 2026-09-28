@@ -63,6 +63,11 @@ export const ALL_RED_TILES = [
   ...RED_TILES_BY_EXPANSION.thundersEdge
 ];
 
+const RED_TILES_SET = new Set(ALL_RED_TILES);
+export function isRedTile(tileId) {
+  return RED_TILES_SET.has(Number(tileId));
+}
+
 export function getActiveRedTiles(expansions = {}) {
   const tiles = [...RED_TILES_BY_EXPANSION.base];
   if (expansions?.pok) {

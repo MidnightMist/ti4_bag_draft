@@ -7,7 +7,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import { DEFAULT_BLUE_TILES, getDefaultTiersForExpansions } from './data/blueTiles.js';
 import { validateBlueTiers } from './data/tierValidator.js';
-import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, ALL_37_HEXES, getActiveHexes, FIVE_PLAYER_HYPERLANES, FOUR_PLAYER_HYPERLANES, SEVEN_PLAYER_HYPERLANES, EIGHT_PLAYER_HYPERLANES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
+import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, isAnomaly, isRedTile, ALL_37_HEXES, getActiveHexes, FIVE_PLAYER_HYPERLANES, FOUR_PLAYER_HYPERLANES, SEVEN_PLAYER_HYPERLANES, EIGHT_PLAYER_HYPERLANES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
 import { FACTIONS } from './data/factionsData.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -184,6 +184,20 @@ function startDraftingPhase(room) {
     // Number of draft picks completed
     p.draftPicksCount = 0;
   });
+
+  // Initialize circular draft queue state
+  // Each player holds a hand of items to pick from. Initially each player has their dealt hand.
+  // We track round index (0 to 6 total picks needed: 3 blue tiles, 2 red tiles, 2 factions)
+  room.draftState = {
+    roundIndex: 0,
+    hands: room.players.map(p => ({
+      slotId: p.slotId,
+      tiles: [...p.draftHand.tiles],
+      factions: [...p.draftHand.factions],
+    })),
+    // pendingSelections stores each player's selection for the current round before passing
+    pendingSelections: {},
+  };
 }
 
 /**
@@ -486,6 +500,347 @@ io.on('connection', (socket) => {
     const allBanned = room.players.every(p => p.hasBanned);
     if (allBanned) {
       startDraftingPhase(room);
+    }
+
+    io.to(roomId).emit('room_state', room);
+  });
+
+  // DEV TOOLBAR: Auto-submit draft picks for remaining bots/players in the current round
+  socket.on('dev_autodraft_round', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.status !== 'drafting' || !room.draftState) return;
+
+    const playerCount = room.settings?.playerCount || room.players.length;
+    const maxBlue = playerCount === 3 ? 6 : 3;
+    const maxRed = 2;
+    const maxFactions = 2;
+
+    room.players.forEach(player => {
+      if (room.draftState.pendingSelections[player.slotId]) return;
+
+      const playerHand = room.draftState.hands.find(h => h.slotId === player.slotId) || player.draftHand || { tiles: [], factions: [] };
+      const pickedTiles = player.pickedItems?.tiles || [];
+      const pickedFactions = player.pickedItems?.factions || [];
+      const blueCount = pickedTiles.filter(t => !isRedTile(t)).length;
+      const redCount = pickedTiles.filter(t => isRedTile(t)).length;
+      const factionCount = pickedFactions.length;
+
+      const hasBlueRoom = blueCount < maxBlue;
+      const hasRedRoom = redCount < maxRed;
+      const hasFactionRoom = factionCount < maxFactions;
+
+      // Find first valid pick
+      let chosenType = 'pass';
+      let chosenId = null;
+
+      if (hasFactionRoom && playerHand.factions && playerHand.factions.length > 0) {
+        chosenType = 'faction';
+        chosenId = playerHand.factions[0];
+      } else if (playerHand.tiles && playerHand.tiles.length > 0) {
+        const validTile = playerHand.tiles.find(t => {
+          const isRed = isRedTile(t);
+          return isRed ? hasRedRoom : hasBlueRoom;
+        });
+        if (validTile !== undefined) {
+          chosenType = 'tile';
+          chosenId = validTile;
+        }
+      }
+
+      const isPass = chosenType === 'pass';
+      room.draftState.pendingSelections[player.slotId] = {
+        isPass,
+        itemType: isPass ? null : chosenType,
+        itemId: isPass ? null : (chosenType === 'tile' ? Number(chosenId) : chosenId),
+      };
+
+      if (!isPass && chosenId !== null) {
+        if (chosenType === 'faction') {
+          if (!player.pickedItems.factions.includes(chosenId)) {
+            player.pickedItems.factions.push(chosenId);
+          }
+        } else {
+          const numTile = Number(chosenId);
+          if (!player.pickedItems.tiles.includes(numTile)) {
+            player.pickedItems.tiles.push(numTile);
+          }
+        }
+      }
+      player.draftPicksCount = (player.pickedItems.tiles?.length || 0) + (player.pickedItems.factions?.length || 0);
+    });
+
+    // Check if all submitted
+    const allSubmitted = room.players.every(p => room.draftState.pendingSelections[p.slotId]);
+    if (allSubmitted) {
+      // Apply and rotate hands
+      const totalRequiredPicks = 7;
+      room.draftState.roundIndex += 1;
+
+      if (room.draftState.roundIndex < totalRequiredPicks) {
+        const currentHands = [...room.draftState.hands];
+        const N = room.players.length;
+        const newHands = room.players.map((p, idx) => {
+          const sourceIdx = (idx - 1 + N) % N;
+          const sourceHand = currentHands[sourceIdx];
+          const sel = room.draftState.pendingSelections[room.players[sourceIdx].slotId];
+          const nextTiles = [...sourceHand.tiles];
+          const nextFactions = [...sourceHand.factions];
+
+          if (sel && !sel.isPass && sel.itemId !== null) {
+            if (sel.itemType === 'faction') {
+              const fIdx = nextFactions.indexOf(sel.itemId);
+              if (fIdx >= 0) nextFactions.splice(fIdx, 1);
+            } else {
+              const tIdx = nextTiles.indexOf(sel.itemId);
+              if (tIdx >= 0) nextTiles.splice(tIdx, 1);
+            }
+          }
+
+          const targetPlayer = room.players[idx];
+          nextFactions.forEach(fId => {
+            if (!targetPlayer.seenItems.factions.includes(fId)) {
+              targetPlayer.seenItems.factions.push(fId);
+            }
+          });
+          nextTiles.forEach(tId => {
+            if (!targetPlayer.seenItems.tiles.includes(tId)) {
+              targetPlayer.seenItems.tiles.push(tId);
+            }
+          });
+
+          return {
+            slotId: targetPlayer.slotId,
+            tiles: nextTiles,
+            factions: nextFactions,
+          };
+        });
+
+        room.draftState.hands = newHands;
+        room.draftState.pendingSelections = {};
+
+        room.players.forEach(p => {
+          const h = room.draftState.hands.find(hand => hand.slotId === p.slotId);
+          if (h) {
+            p.draftHand = {
+              tiles: [...h.tiles],
+              factions: [...h.factions],
+            };
+          }
+        });
+      } else {
+        startMapBuilding(room);
+        delete room.draftState;
+      }
+    }
+
+    io.to(roomId).emit('room_state', room);
+  });
+
+  socket.on('draft_pick', ({ roomId, slotId, itemType, itemId }) => {
+    const room = rooms.get(roomId);
+    if (!room || room.status !== 'drafting') {
+      socket.emit('room_error', { message: 'Room not in drafting phase' });
+      return;
+    }
+
+    const player = room.players.find(p => p.slotId === slotId);
+    if (!player) {
+      socket.emit('room_error', { message: 'Player slot not found' });
+      return;
+    }
+
+    if (!room.draftState || !room.draftState.hands) {
+      socket.emit('room_error', { message: 'Draft state not initialized' });
+      return;
+    }
+
+    // Check if player has already made a selection for this round
+    if (room.draftState.pendingSelections[slotId]) {
+      socket.emit('room_error', { message: 'You have already submitted your pick for this round' });
+      return;
+    }
+
+    const playerHand = room.draftState.hands.find(h => h.slotId === slotId);
+    if (!playerHand) {
+      socket.emit('room_error', { message: 'Player draft hand not found' });
+      return;
+    }
+
+    // Determine target item category and validate presence in current draft hand
+    const numId = Number(itemId);
+    let isFaction = itemType === 'faction';
+    let isPass = itemType === 'pass';
+    let foundInHand = false;
+
+    if (!isPass) {
+      if (isFaction) {
+        foundInHand = playerHand.factions.includes(itemId) || playerHand.factions.includes(numId);
+      } else {
+        foundInHand = playerHand.tiles.includes(itemId) || playerHand.tiles.includes(numId);
+      }
+    }
+
+    const playerCount = room.settings?.playerCount || room.players.length;
+    const maxBlue = playerCount === 3 ? 6 : 3;
+    const maxRed = 2;
+    const maxFactions = 2;
+
+    const pickedTiles = player.pickedItems?.tiles || [];
+    const pickedFactions = player.pickedItems?.factions || [];
+    const bluePickedCount = pickedTiles.filter(t => !isRedTile(t)).length;
+    const redPickedCount = pickedTiles.filter(t => isRedTile(t)).length;
+    const factionPickedCount = pickedFactions.length;
+
+    // Quotas: maxBlue, 2 Red, 2 Factions
+    const hasBlueRoom = bluePickedCount < maxBlue;
+    const hasRedRoom = redPickedCount < maxRed;
+    const hasFactionRoom = factionPickedCount < maxFactions;
+
+    let isValidPick = false;
+
+    if (isPass) {
+      // Pass is ALWAYS accepted and valid so players are never blocked or stuck
+      isValidPick = true;
+    } else {
+      if (!foundInHand) {
+        socket.emit('room_error', { message: 'Selected item not found in your current draft hand' });
+        return;
+      }
+
+      if (isFaction) {
+        if (!hasFactionRoom) {
+          socket.emit('room_error', { message: 'You already have your maximum 2 factions!' });
+          return;
+        }
+        isValidPick = true;
+      } else {
+        const isRed = isRedTile(numId);
+        if (isRed) {
+          if (!hasRedRoom) {
+            socket.emit('room_error', { message: 'You already have your maximum 2 red tiles!' });
+            return;
+          }
+          isValidPick = true;
+        } else {
+          if (!hasBlueRoom) {
+            socket.emit('room_error', { message: `You already have your maximum ${maxBlue} blue tiles!` });
+            return;
+          }
+          isValidPick = true;
+        }
+      }
+    }
+
+    // Record selection for this round
+    room.draftState.pendingSelections[slotId] = {
+      isPass,
+      itemType: isPass ? null : (isFaction ? 'faction' : 'tile'),
+      itemId: isPass ? null : (isFaction ? itemId : numId),
+    };
+
+    // Immediately add the picked item to player's pickedItems so it appears in the bottom hand right away
+    const sel = room.draftState.pendingSelections[slotId];
+    if (sel && !sel.isPass && sel.itemId !== null) {
+      if (sel.itemType === 'faction') {
+        if (!player.pickedItems.factions.includes(sel.itemId)) {
+          player.pickedItems.factions.push(sel.itemId);
+        }
+      } else {
+        if (!player.pickedItems.tiles.includes(sel.itemId)) {
+          player.pickedItems.tiles.push(sel.itemId);
+        }
+      }
+    }
+    player.draftPicksCount = (player.pickedItems.tiles?.length || 0) + (player.pickedItems.factions?.length || 0);
+
+    // Check if ALL players have submitted their pending selections for this round
+    const allSubmitted = room.players.every(p => room.draftState.pendingSelections[p.slotId]);
+
+    if (allSubmitted) {
+      // 1. Ensure all selections are applied (idempotently) and update seen items / hands
+      room.players.forEach(p => {
+        const pSel = room.draftState.pendingSelections[p.slotId];
+        if (pSel && !pSel.isPass && pSel.itemId !== null) {
+          if (pSel.itemType === 'faction') {
+            if (!p.pickedItems.factions.includes(pSel.itemId)) {
+              p.pickedItems.factions.push(pSel.itemId);
+            }
+          } else {
+            if (!p.pickedItems.tiles.includes(pSel.itemId)) {
+              p.pickedItems.tiles.push(pSel.itemId);
+            }
+          }
+        }
+        p.draftPicksCount = (p.pickedItems.tiles?.length || 0) + (p.pickedItems.factions?.length || 0);
+      });
+
+      // 2. Pass hands in a circle
+      // If there are more rounds (e.g. roundIndex < 6, since total picks = 3 blue + 2 red + 2 factions = 7 picks)
+      const totalRequiredPicks = 7;
+      room.draftState.roundIndex += 1;
+
+      if (room.draftState.roundIndex < totalRequiredPicks) {
+        // Rotate hands clockwise (player i receives hand from player (i - 1 + N) % N)
+        const currentHands = [...room.draftState.hands];
+        const N = room.players.length;
+        const newHands = room.players.map((p, idx) => {
+          // The hand coming to player idx comes from player (idx - 1 + N) % N
+          const sourceIdx = (idx - 1 + N) % N;
+          const sourceHand = currentHands[sourceIdx];
+
+          // Remove the selected item from the source hand
+          const sel = room.draftState.pendingSelections[room.players[sourceIdx].slotId];
+          const nextTiles = [...sourceHand.tiles];
+          const nextFactions = [...sourceHand.factions];
+
+          if (sel && !sel.isPass && sel.itemId !== null) {
+            if (sel.itemType === 'faction') {
+              const fIdx = nextFactions.indexOf(sel.itemId);
+              if (fIdx >= 0) nextFactions.splice(fIdx, 1);
+            } else {
+              const tIdx = nextTiles.indexOf(sel.itemId);
+              if (tIdx >= 0) nextTiles.splice(tIdx, 1);
+            }
+          }
+
+          // Also update player's seenItems accumulator
+          const targetPlayer = room.players[idx];
+          nextFactions.forEach(fId => {
+            if (!targetPlayer.seenItems.factions.includes(fId)) {
+              targetPlayer.seenItems.factions.push(fId);
+            }
+          });
+          nextTiles.forEach(tId => {
+            if (!targetPlayer.seenItems.tiles.includes(tId)) {
+              targetPlayer.seenItems.tiles.push(tId);
+            }
+          });
+
+          return {
+            slotId: targetPlayer.slotId,
+            tiles: nextTiles,
+            factions: nextFactions,
+          };
+        });
+
+        room.draftState.hands = newHands;
+        room.draftState.pendingSelections = {};
+
+        // Update each player's active draftHand to the new passed hand
+        room.players.forEach(p => {
+          const h = room.draftState.hands.find(hand => hand.slotId === p.slotId);
+          if (h) {
+            p.draftHand = {
+              tiles: [...h.tiles],
+              factions: [...h.factions],
+            };
+          }
+        });
+      } else {
+        // Draft is complete! Transition to map building phase
+        startMapBuilding(room);
+        delete room.draftState;
+      }
     }
 
     io.to(roomId).emit('room_state', room);
