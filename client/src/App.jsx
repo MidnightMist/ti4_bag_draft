@@ -24,7 +24,7 @@ function Home() {
             onMouseEnter={(e) => e.target.style.backgroundColor = '#1d4ed8'}
             onMouseLeave={(e) => e.target.style.backgroundColor = '#2563eb'}
           >
-            🎲 Random Map Creation
+            🌌 Galaxy Builder
           </Link>
           <Link 
             to="/draft" 
@@ -133,7 +133,7 @@ export default function App() {
         <Route 
           path="/map" 
           element={
-            <PageLayout title="Random Map Creation — Setup">
+            <PageLayout title="Galaxy Builder — Setup">
               <CreateRoom />
             </PageLayout>
           } 

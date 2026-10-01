@@ -142,7 +142,7 @@ export default function CreateRoom({ onCancel }) {
   return (
     <div id="create-room-container" style={containerStyle}>
       <h2 style={{ marginTop: 0, marginBottom: '24px', fontSize: '24px', color: '#f3f4f6' }}>
-        Room Setup: Random Map Creation
+        Room Setup: Galaxy Builder
       </h2>
 
       {error && (

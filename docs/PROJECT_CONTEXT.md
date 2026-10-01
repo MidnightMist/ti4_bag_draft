@@ -13,7 +13,7 @@
 - **Shared Data & Architecture:**
   - `client/src/data/` serves as the authoritative single source of truth for tile catalogs (`tileData.js`), factions (`factionsData.js`), and tier validation (`tierValidator.js`).
   - `server/data/` re-exports directly from `client/src/data/` ensuring 100% synchronization between client and server with zero logic duplication.
-  - `TierConfigEditor.jsx` encapsulates the 3-tier blue tile balance configuration shared across both Random Map and Bag Draft setups.
+  - `TierConfigEditor.jsx` encapsulates the 3-tier blue tile balance configuration shared across both Galaxy Builder and Bag Draft setups.
 - **Persistence / State Management:**
   - In-memory `rooms` map on the server with full Socket.IO event broadcasting (`join_room`, `claim_slot`, `unclaim_slot`, `room_state`, `room_error`).
   - Client user identity using persistent `localStorage` UUID (`getOrCreateUserId`) so players can claim their slots from separate devices or refresh their browser without losing their slot.
@@ -21,14 +21,14 @@
 
 ---
 
-## 2. Core Feature: Random Map Creation & Bag Draft Setup
+## 2. Core Feature: Galaxy Builder & Bag Draft Setup
 
 ### Phase 1: Room Creation & Settings (`CreateRoom.jsx`, `CreateDraftRoom.jsx`, `/map`, `/draft`)
-- **Random Map Creation Setup (`/map` - `CreateRoom.jsx`):**
+- **Galaxy Builder Setup (`/map` - `CreateRoom.jsx`):**
   - Player Count (3-8), Custom Player Names, Expansions (PoK, Thunder's Edge).
   - Tile Distribution Mode: Random Tiles or Balanced Tiles (3 Tiers with tier customization and strict `validateBlueTiers` validation).
 - **Bag Draft Room Setup (`/draft` - `CreateDraftRoom.jsx`):**
-  - Similar to Random Map Creation setup.
+  - Similar to Galaxy Builder setup.
   - **Balanced Tiles Only:** Balanced tiles (3 Tiers) is always enabled by default with tier customization; the random/balanced mode switcher is omitted.
   - **Faction Selection (30 Factions):** Checkboxes for all 30 factions categorized into Base Game (18), Prophecy of Kings (7), and Thunder's Edge (5). Faction names are cleaned up from filenames (`TI4 - ...` prefix removed).
   - **Expansion-Driven Faction Filtering:** Toggling Prophecy of Kings or Thunder's Edge expansions automatically enables/disables and checks/unchecks the corresponding expansion factions.
@@ -40,7 +40,7 @@
   - Each player opens the URL and claims their slot.
   - Once claimed, the slot is locked to that user's ID and highlighted in blue. Other players see it as "Claimed".
   - A player can unclaim/release their slot if needed.
-- **Transition Trigger (Random Map):**
+- **Transition Trigger (Galaxy Builder):**
   - When all `N` players claim their slots, the room state transitions from `"lobby"` to active map creation (`map_building`).
 - **Transition Trigger (Bag Draft):**
   - When all `N` players claim their slots, Bag Draft rooms transition to **Step 1: Faction Banning (`faction_ban`)**.
