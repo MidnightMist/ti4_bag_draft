@@ -156,3 +156,7 @@ tiles/
 # Local faction references
 client/public/factions/
 factions/
+
+# Persisted room states
+storage/
+rooms_data/

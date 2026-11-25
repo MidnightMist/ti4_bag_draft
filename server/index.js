@@ -9,6 +9,7 @@ import { DEFAULT_BLUE_TILES, getDefaultTiersForExpansions } from './data/blueTil
 import { validateBlueTiers } from './data/tierValidator.js';
 import { getMecatolTileId, getActiveBlueTiles, getActiveRedTiles, isAnomaly, isRedTile, ALL_37_HEXES, getActiveHexes, FIVE_PLAYER_HYPERLANES, FOUR_PLAYER_HYPERLANES, SEVEN_PLAYER_HYPERLANES, EIGHT_PLAYER_HYPERLANES, getCurrentActiveRing, validatePlacement, getPlayerForTurn } from './data/tileData.js';
 import { FACTIONS } from './data/factionsData.js';
+import { initRoomStore, getRoom, setRoom, saveRoom } from './roomStore.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,8 +25,8 @@ const io = new Server(httpServer, {
   }
 });
 
-// In-memory room store: roomId -> RoomState
-const rooms = new Map();
+// Persistent room store: roomId -> RoomState (backed by storage/rooms/*.json)
+initRoomStore();
 
 function generateRoomId() {
   return crypto.randomBytes(4).toString('hex'); // 8-char hex code (e.g. "a3f89b1c")
@@ -570,6 +571,7 @@ function sanitizeRoomForUser(room, viewerUserId) {
 
 function broadcastRoomState(room) {
   if (!room) return;
+  saveRoom(room);
   const roomSockets = io.sockets.adapter.rooms.get(room.id);
   if (!roomSockets) return;
 
@@ -655,7 +657,7 @@ app.post('/api/rooms', (req, res) => {
       }
     };
 
-    rooms.set(roomId, roomData);
+    setRoom(roomId, roomData);
     console.log(`[Room Created] Room ID: ${roomId}, Players: ${count}, Mode: ${tileMode}`);
     res.json({ success: true, roomId, room: sanitizeRoomForUser(roomData, null) });
   } catch (err) {
@@ -666,7 +668,7 @@ app.post('/api/rooms', (req, res) => {
 
 app.get('/api/rooms/:id', (req, res) => {
   try {
-    const room = rooms.get(req.params.id);
+    const room = getRoom(req.params.id);
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });
     }
@@ -685,6 +687,7 @@ app.get('/api/rooms/:id', (req, res) => {
     // Auto-deal if already in map_building but hands missing
     if (room.status === 'map_building' && room.players.some(p => !p.hand)) {
       dealPlayerHands(room);
+      saveRoom(room);
     }
     res.json({ room: sanitizeRoomForUser(room, viewerUserId) });
   } catch (err) {
@@ -696,7 +699,7 @@ app.get('/api/rooms/:id', (req, res) => {
 // Socket.io for real-time room and claim synchronization
 io.on('connection', (socket) => {
   socket.on('join_room', ({ roomId, userId }) => {
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room) {
       socket.emit('room_error', { message: 'Room not found', fatal: true });
       return;
@@ -725,7 +728,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('claim_slot', ({ roomId, slotId, userId }) => {
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room) {
       socket.emit('room_error', { message: 'Room not found' });
       return;
@@ -787,7 +790,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('unclaim_slot', ({ roomId, slotId, userId }) => {
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room || room.status !== 'lobby') return;
 
     const callerUserId = socket.data.userId;
@@ -807,7 +810,7 @@ io.on('connection', (socket) => {
   // DEV TOOLBAR: Auto-fill remaining open slots with simulated players
   socket.on('dev_autofill_room', ({ roomId, currentUserId }) => {
     if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room) return;
 
     const validUserId = isValidUserId(currentUserId)
@@ -856,7 +859,7 @@ io.on('connection', (socket) => {
   // DEV TOOLBAR: Auto-submit bans for other players (bots) to advance to drafting phase immediately
   socket.on('dev_autoban_room', ({ roomId }) => {
     if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room || room.status !== 'faction_ban') return;
 
     room.players.forEach(p => {
@@ -877,7 +880,7 @@ io.on('connection', (socket) => {
   // DEV TOOLBAR: Auto-submit random valid draft picks for remaining bots/players in the current round
   socket.on('dev_autodraft_round', ({ roomId }) => {
     if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room || room.status !== 'drafting' || !room.draftState) return;
 
     const playerCount = room.settings?.playerCount || room.players.length;
@@ -948,7 +951,7 @@ io.on('connection', (socket) => {
   // DEV TOOLBAR: Instantly randomly distribute all remaining draft elements among participants and complete the draft
   socket.on('dev_autodraft_all', ({ roomId }) => {
     if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room || room.status !== 'drafting' || !room.draftState) return;
 
     const playerCount = room.settings?.playerCount || room.players.length;
@@ -1062,7 +1065,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('draft_pick', ({ roomId, slotId, itemType, itemId }) => {
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room || room.status !== 'drafting') {
       socket.emit('room_error', { message: 'Room not in drafting phase' });
       return;
@@ -1212,7 +1215,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('submit_faction_ban', ({ roomId, slotId, factionId }) => {
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room || room.status !== 'faction_ban') {
       socket.emit('room_error', { message: 'Room not in faction ban phase' });
       return;
@@ -1257,7 +1260,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('place_tile', ({ roomId, slotId, tileId, hexId }) => {
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room || room.status !== 'map_building') {
       socket.emit('room_error', { message: 'Room not in map building phase' });
       return;
@@ -1348,7 +1351,7 @@ io.on('connection', (socket) => {
   // DEV TOOLBAR: Instantly complete map by placing remaining tiles
   socket.on('dev_complete_map', ({ roomId }) => {
     if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room || room.status !== 'map_building') return;
 
     // Collect all remaining hand tiles
@@ -1399,7 +1402,7 @@ io.on('connection', (socket) => {
 
   // Post-Draft Faction Selection: Active player chooses 1 of their 2 drafted factions
   socket.on('select_faction', ({ roomId, slotId, factionId }) => {
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room || room.status !== 'faction_selection') {
       socket.emit('room_error', { message: 'Room not in faction selection phase' });
       return;
@@ -1450,7 +1453,7 @@ io.on('connection', (socket) => {
   // DEV TOOLBAR: Auto-select factions for all players and complete
   socket.on('dev_auto_select_factions', ({ roomId }) => {
     if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room || room.status !== 'faction_selection') return;
 
     room.players.forEach(p => {
@@ -1468,7 +1471,7 @@ io.on('connection', (socket) => {
   // DEV TOOLBAR: Reset room back to lobby and clear all claims
   socket.on('dev_reset_room', ({ roomId }) => {
     if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
-    const room = rooms.get(roomId);
+    const room = getRoom(roomId);
     if (!room) return;
 
     const playerCount = room.settings?.playerCount || room.players.length;

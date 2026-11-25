@@ -15,7 +15,7 @@
   - `server/data/` re-exports directly from `client/src/data/` ensuring 100% synchronization between client and server with zero logic duplication.
   - `TierConfigEditor.jsx` encapsulates the 3-tier blue tile balance configuration shared across both Galaxy Builder and Bag Draft setups.
 - **Persistence / State Management:**
-  - In-memory `rooms` map on the server with full Socket.IO event broadcasting (`join_room`, `claim_slot`, `unclaim_slot`, `room_state`, `room_error`).
+  - Server-side `roomStore.js` maintains an in-memory cache backed by atomic per-room JSON persistence in `rooms_data/<roomId>.json` (configurable via `ROOMS_DATA_DIR`, gitignored so deployments via `git pull` + PM2 restart preserve all active and completed rooms) with full Socket.IO event broadcasting (`join_room`, `claim_slot`, `unclaim_slot`, `room_state`, `room_error`).
   - Client user identity using persistent `localStorage` UUID (`getOrCreateUserId`) so players can claim their slots from separate devices or refresh their browser without losing their slot.
 - **Build / Dev Ports:** Port 3000 (proxied). Production build via `npm run build:client` (Vite) and `npm start` (Express serving static + Socket.IO API).
 
