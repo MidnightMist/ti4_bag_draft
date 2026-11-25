@@ -14,19 +14,12 @@ export default function DraftingPhaseView({
   chipStyle,
   copyBtnStyle,
   headerCardStyle,
+  onBackHome,
+  actionError,
+  onClearActionError,
 }) {
-  // Allow viewing/controlling claimed slot or any active seat in dev/testing
-  const initialSlotId = myClaimedSlot ? myClaimedSlot.slotId : (room.players.find(p => p.claimedBy === userId)?.slotId ?? 0);
-  const [selectedSlotId, setSelectedSlotId] = useState(initialSlotId);
-
-  // Sync selectedSlotId if myClaimedSlot changes
-  useEffect(() => {
-    if (myClaimedSlot) {
-      setSelectedSlotId(myClaimedSlot.slotId);
-    }
-  }, [myClaimedSlot]);
-
-  const activePlayer = room.players.find(p => p.slotId === selectedSlotId) || myClaimedSlot || room.players[0];
+  // Strictly allow viewing and controlling ONLY the authenticated user's claimed slot
+  const activePlayer = myClaimedSlot || room.players.find(p => p.isMe || (Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId)) || null;
 
   // Hover state for zoomed hint preview
   const [hoveredItem, setHoveredItem] = useState(null);
@@ -42,6 +35,26 @@ export default function DraftingPhaseView({
     setSelectedItem(null);
     setActionFeedback(null);
   }, [activePlayer?.slotId, room.draftState?.roundIndex]);
+
+  if (!activePlayer) {
+    return (
+      <div id="draft-access-restricted" style={{ maxWidth: '640px', margin: '48px auto', padding: '32px', backgroundColor: '#171724', border: '1px solid #ef4444', borderRadius: '14px', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.45)' }}>
+        <div style={{ fontSize: '36px', marginBottom: '12px' }}>🔒</div>
+        <h2 style={{ margin: '0 0 10px 0', color: '#f9fafb', fontSize: '20px' }}>Access Restricted</h2>
+        <p style={{ margin: '0 0 22px 0', color: '#9ca3af', fontSize: '14px', lineHeight: '1.5' }}>
+          This draft is private to room participants. Only players who claimed a seat before the draft started can view their draft choices and make picks.
+        </p>
+        {onBackHome && (
+          <button
+            onClick={onBackHome}
+            style={{ padding: '10px 22px', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
+          >
+            Back to Home
+          </button>
+        )}
+      </div>
+    );
+  }
 
   const draftHand = activePlayer.draftHand || { tiles: [], factions: [] };
   const seenItems = activePlayer.seenItems || { tiles: [], factions: [] };
@@ -118,12 +131,15 @@ export default function DraftingPhaseView({
 
   const totalPlayersCount = room.players.length;
   const completedPlayersCount = room.players.filter(p => {
+    if (typeof p.isDraftComplete === 'boolean') return p.isDraftComplete;
     const tiles = p.pickedItems?.tiles || [];
     const factions = p.pickedItems?.factions || [];
     const b = tiles.filter(t => !isRedTile(t)).length;
     const r = tiles.filter(t => isRedTile(t)).length;
     return b >= maxBlue && r >= maxRed && factions.length >= maxFactions;
   }).length;
+
+  const displayedFeedback = actionFeedback || actionError;
 
   return (
     <div id="drafting-phase-container" style={{ maxWidth: '1440px', margin: '0 auto', padding: '0 8px 32px 8px' }}>
@@ -159,12 +175,12 @@ export default function DraftingPhaseView({
             ✓ {completedPlayersCount} / {totalSlots} Players Complete
           </span>
           <span style={{ ...chipStyle, backgroundColor: '#1f2937', color: '#9ca3af' }}>
-            Controlling: <strong style={{ color: '#f3f4f6' }}>{activePlayer.name}</strong>
+            Your Seat: <strong style={{ color: '#f3f4f6' }}>{activePlayer.name}</strong>
           </span>
         </div>
       </div>
 
-      {actionFeedback && (
+      {displayedFeedback && (
         <div style={{
           marginTop: '16px',
           backgroundColor: '#451a03',
@@ -180,10 +196,13 @@ export default function DraftingPhaseView({
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span>⚠️</span>
-            <span>{actionFeedback}</span>
+            <span>{displayedFeedback}</span>
           </div>
           <button
-            onClick={() => setActionFeedback(null)}
+            onClick={() => {
+              setActionFeedback(null);
+              if (onClearActionError) onClearActionError();
+            }}
             style={{ background: 'none', border: 'none', color: '#fde68a', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}
           >
             ✕
@@ -640,11 +659,11 @@ export default function DraftingPhaseView({
                   Your Picked Elements (Hand)
                 </span>
                 <span style={{ fontSize: '11px', color: '#9ca3af', backgroundColor: '#1e293b', padding: '2px 6px', borderRadius: '4px' }}>
-                  {factionCount}/2 factions, {pickedTiles.length}/5 tiles ({blueCount} blue, {redCount} red)
+                  {factionCount}/{maxFactions} factions, {pickedTiles.length}/{maxBlue + maxRed} tiles ({blueCount} blue, {redCount} red)
                 </span>
               </div>
               <span style={{ fontSize: '11px', color: '#6b7280' }}>
-                Target: 3 Blue, 2 Red, 2 Factions
+                Target: {maxBlue} Blue, {maxRed} Red, {maxFactions} Factions
               </span>
             </div>
 
@@ -766,45 +785,41 @@ export default function DraftingPhaseView({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {room.players.map((p) => {
-                const isMe = Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId;
-                const isViewing = p.slotId === selectedSlotId;
+                const isMe = Boolean(p.isMe || (userId && p.claimedBy && p.claimedBy === userId));
                 const picksMade = p.draftPicksCount || 0;
                 const submitted = Boolean(pendingSelections[p.slotId]);
-                const pTiles = p.pickedItems?.tiles || [];
-                const pFactions = p.pickedItems?.factions || [];
-                const pBlue = pTiles.filter(t => !isRedTile(t)).length;
-                const pRed = pTiles.filter(t => isRedTile(t)).length;
-                const isPlayerDone = pBlue >= maxBlue && pRed >= maxRed && pFactions.length >= maxFactions;
+                const isPlayerDone = typeof p.isDraftComplete === 'boolean'
+                  ? p.isDraftComplete
+                  : (() => {
+                      const pTiles = p.pickedItems?.tiles || [];
+                      const pFactions = p.pickedItems?.factions || [];
+                      const pBlue = pTiles.filter(t => !isRedTile(t)).length;
+                      const pRed = pTiles.filter(t => isRedTile(t)).length;
+                      return pBlue >= maxBlue && pRed >= maxRed && pFactions.length >= maxFactions;
+                    })();
 
                 return (
                   <div
                     key={p.slotId}
-                    onClick={() => setSelectedSlotId(p.slotId)}
                     style={{
                       display: 'flex',
                       justifyContent: 'space-between',
                       alignItems: 'center',
                       padding: '10px 12px',
-                      backgroundColor: isViewing ? '#1e293b' : isMe ? '#182030' : '#111827',
-                      border: `1.5px solid ${isViewing ? '#60a5fa' : isMe ? '#3b82f6' : '#272738'}`,
+                      backgroundColor: isMe ? '#182030' : '#111827',
+                      border: `1.5px solid ${isMe ? '#3b82f6' : '#272738'}`,
                       borderRadius: '8px',
-                      cursor: 'pointer',
+                      cursor: 'default',
                       transition: 'all 0.15s ease',
                     }}
-                    title={`Click to view or control ${p.name}'s draft hand`}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                      <span style={{ fontSize: '13px', fontWeight: (isMe || isViewing) ? 'bold' : 'normal', color: isViewing ? '#93c5fd' : isMe ? '#bfdbfe' : '#e5e7eb' }}>
+                      <span style={{ fontSize: '13px', fontWeight: isMe ? 'bold' : 'normal', color: isMe ? '#bfdbfe' : '#e5e7eb' }}>
                         {p.name}
                       </span>
                       {isMe && (
                         <span style={{ fontSize: '9px', backgroundColor: '#2563eb', color: '#fff', padding: '1px 5px', borderRadius: '3px', fontWeight: 'bold' }}>
                           YOU
-                        </span>
-                      )}
-                      {isViewing && !isMe && (
-                        <span style={{ fontSize: '9px', backgroundColor: '#374151', color: '#93c5fd', padding: '1px 5px', borderRadius: '3px', fontWeight: 'bold' }}>
-                          VIEWING
                         </span>
                       )}
                     </div>
@@ -840,6 +855,9 @@ export default function DraftingPhaseView({
 
             <div style={{ marginTop: '14px', fontSize: '11px', color: '#6b7280', textAlign: 'center', lineHeight: '1.4' }}>
               🔄 Hands rotate clockwise after all players confirm their selection for the round.
+            </div>
+            <div style={{ marginTop: '8px', fontSize: '11px', color: '#6b7280', textAlign: 'center', lineHeight: '1.4' }}>
+              🔒 Player hands and picks are secret to each player.
             </div>
           </div>
         </div>

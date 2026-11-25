@@ -464,6 +464,135 @@ function dealPlayerHands(room) {
   }
 }
 
+function isValidUserId(userId) {
+  return typeof userId === 'string' && userId.trim() !== '' && userId !== 'null' && userId !== 'undefined' && userId.length <= 128;
+}
+
+function findViewerSlot(room, viewerUserId) {
+  if (!room || !isValidUserId(viewerUserId)) return null;
+  return room.players.find(p => p.claimedBy && p.claimedBy === viewerUserId) || null;
+}
+
+function isSecretDraftPhase(status) {
+  return status === 'faction_ban' || status === 'drafting';
+}
+
+function sanitizeRoomForUser(room, viewerUserId) {
+  const viewerSlot = findViewerSlot(room, viewerUserId);
+  const viewerSlotId = viewerSlot ? viewerSlot.slotId : null;
+  const playerCount = room.settings?.playerCount || room.players.length;
+
+  const sanitizedPlayers = room.players.map((p) => {
+    const isMe = viewerSlotId !== null && p.slotId === viewerSlotId;
+    const base = {
+      slotId: p.slotId,
+      name: p.name,
+      isClaimed: Boolean(p.claimedBy),
+      isMe,
+      claimedAt: p.claimedAt || null,
+      isSpeaker: Boolean(p.isSpeaker),
+    };
+
+    if (p.hasBanned !== undefined) base.hasBanned = Boolean(p.hasBanned);
+    if (p.draftPicksCount !== undefined) base.draftPicksCount = p.draftPicksCount;
+    if (room.status === 'drafting') {
+      base.isDraftComplete = isPlayerDraftComplete(p, playerCount);
+    }
+    if (p.remainingBlue !== undefined) base.remainingBlue = p.remainingBlue;
+    if (p.remainingRed !== undefined) base.remainingRed = p.remainingRed;
+    if (p.selectedFaction !== undefined) base.selectedFaction = p.selectedFaction;
+
+    if (isMe) {
+      if (p.banPool !== undefined) base.banPool = [...p.banPool];
+      if (p.bannedFactionId !== undefined) base.bannedFactionId = p.bannedFactionId;
+      if (p.draftHand !== undefined) {
+        base.draftHand = p.draftHand
+          ? { tiles: [...(p.draftHand.tiles || [])], factions: [...(p.draftHand.factions || [])] }
+          : null;
+      }
+      if (p.seenItems !== undefined) {
+        base.seenItems = p.seenItems
+          ? { tiles: [...(p.seenItems.tiles || [])], factions: [...(p.seenItems.factions || [])] }
+          : null;
+      }
+      if (p.pickedItems !== undefined) {
+        base.pickedItems = p.pickedItems
+          ? { tiles: [...(p.pickedItems.tiles || [])], factions: [...(p.pickedItems.factions || [])] }
+          : null;
+      }
+      if (p.hand !== undefined) {
+        base.hand = p.hand
+          ? { blue: [...(p.hand.blue || [])], red: [...(p.hand.red || [])] }
+          : null;
+      }
+      if (p.draftedFactions !== undefined) base.draftedFactions = [...(p.draftedFactions || [])];
+    }
+
+    return base;
+  });
+
+  const sanitizedRoom = {
+    id: room.id,
+    createdAt: room.createdAt,
+    status: room.status,
+    settings: room.settings,
+    players: sanitizedPlayers,
+    mapState: room.mapState,
+  };
+
+  if (room.factionSelection) {
+    sanitizedRoom.factionSelection = room.factionSelection;
+  }
+
+  if (room.draftState) {
+    const myHand = viewerSlotId !== null
+      ? (room.draftState.hands || []).find(h => h.slotId === viewerSlotId)
+      : null;
+
+    const sanitizedPending = {};
+    Object.keys(room.draftState.pendingSelections || {}).forEach((sId) => {
+      if (viewerSlotId !== null && Number(sId) === viewerSlotId) {
+        sanitizedPending[sId] = { ...room.draftState.pendingSelections[sId] };
+      } else {
+        sanitizedPending[sId] = { submitted: true };
+      }
+    });
+
+    sanitizedRoom.draftState = {
+      roundIndex: room.draftState.roundIndex || 0,
+      hands: myHand ? [{ slotId: myHand.slotId, tiles: [...myHand.tiles], factions: [...myHand.factions] }] : [],
+      pendingSelections: sanitizedPending,
+    };
+  }
+
+  return sanitizedRoom;
+}
+
+function broadcastRoomState(room) {
+  if (!room) return;
+  const roomSockets = io.sockets.adapter.rooms.get(room.id);
+  if (!roomSockets) return;
+
+  for (const socketId of roomSockets) {
+    const clientSocket = io.sockets.sockets.get(socketId);
+    if (!clientSocket) continue;
+
+    const viewerUserId = clientSocket.data?.userId || null;
+    const viewerSlot = findViewerSlot(room, viewerUserId);
+
+    if (isSecretDraftPhase(room.status) && !viewerSlot) {
+      clientSocket.emit('room_error', {
+        message: 'Access denied: this draft is private to room participants.',
+        fatal: true,
+      });
+      clientSocket.leave(room.id);
+      continue;
+    }
+
+    clientSocket.emit('room_state', sanitizeRoomForUser(room, viewerUserId));
+  }
+}
+
 // REST API for room creation and querying
 app.post('/api/rooms', (req, res) => {
   try {
@@ -528,7 +657,7 @@ app.post('/api/rooms', (req, res) => {
 
     rooms.set(roomId, roomData);
     console.log(`[Room Created] Room ID: ${roomId}, Players: ${count}, Mode: ${tileMode}`);
-    res.json({ success: true, roomId, room: roomData });
+    res.json({ success: true, roomId, room: sanitizeRoomForUser(roomData, null) });
   } catch (err) {
     console.error('[Error creating room]:', err);
     res.status(500).json({ error: err.message || 'Internal server error while creating room' });
@@ -541,11 +670,23 @@ app.get('/api/rooms/:id', (req, res) => {
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });
     }
+
+    const headerUserId = req.headers['x-user-id'];
+    const queryUserId = typeof req.query.userId === 'string' ? req.query.userId : null;
+    const viewerUserId = isValidUserId(headerUserId) ? headerUserId : (isValidUserId(queryUserId) ? queryUserId : null);
+    const viewerSlot = findViewerSlot(room, viewerUserId);
+
+    if (isSecretDraftPhase(room.status) && !viewerSlot) {
+      return res.status(403).json({
+        error: 'Access denied: this draft is already in progress and only participants who claimed a slot may enter.'
+      });
+    }
+
     // Auto-deal if already in map_building but hands missing
     if (room.status === 'map_building' && room.players.some(p => !p.hand)) {
       dealPlayerHands(room);
     }
-    res.json({ room });
+    res.json({ room: sanitizeRoomForUser(room, viewerUserId) });
   } catch (err) {
     console.error('[Error fetching room]:', err);
     res.status(500).json({ error: err.message || 'Internal server error while fetching room' });
@@ -554,22 +695,33 @@ app.get('/api/rooms/:id', (req, res) => {
 
 // Socket.io for real-time room and claim synchronization
 io.on('connection', (socket) => {
-  let currentRoomId = null;
-  let currentUserId = null;
-
   socket.on('join_room', ({ roomId, userId }) => {
     const room = rooms.get(roomId);
     if (!room) {
-      socket.emit('room_error', { message: 'Room not found' });
+      socket.emit('room_error', { message: 'Room not found', fatal: true });
       return;
     }
 
-    currentRoomId = roomId;
-    currentUserId = userId;
+    if (!isValidUserId(userId)) {
+      socket.emit('room_error', { message: 'Invalid user session', fatal: true });
+      return;
+    }
+
+    const viewerSlot = findViewerSlot(room, userId);
+    if (isSecretDraftPhase(room.status) && !viewerSlot) {
+      socket.emit('room_error', {
+        message: 'Access denied: this draft is already in progress and only participants who claimed a slot may enter.',
+        fatal: true,
+      });
+      return;
+    }
+
+    socket.data.roomId = roomId;
+    socket.data.userId = userId;
     socket.join(roomId);
 
-    // Send current state
-    socket.emit('room_state', room);
+    // Send personalized sanitized state
+    socket.emit('room_state', sanitizeRoomForUser(room, userId));
   });
 
   socket.on('claim_slot', ({ roomId, slotId, userId }) => {
@@ -579,9 +731,24 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const validUserId = (userId && typeof userId === 'string' && userId.trim() !== '' && userId !== 'null' && userId !== 'undefined')
-      ? userId 
-      : `user_dev_${Math.random().toString(36).substring(2, 8)}`;
+    if (room.status !== 'lobby') {
+      socket.emit('room_error', { message: 'Slots can only be claimed in the lobby' });
+      return;
+    }
+
+    if (!isValidUserId(userId)) {
+      socket.emit('room_error', { message: 'Invalid user session' });
+      return;
+    }
+
+    if (socket.data.userId && socket.data.userId !== userId) {
+      socket.emit('room_error', { message: 'Unauthorized session mismatch' });
+      return;
+    }
+
+    const validUserId = userId;
+    socket.data.userId = validUserId;
+    socket.data.roomId = roomId;
 
     // Release any other slot claimed by validUserId
     room.players.forEach(p => {
@@ -616,33 +783,35 @@ io.on('connection', (socket) => {
       }
     }
 
-    io.to(roomId).emit('room_state', room);
+    broadcastRoomState(room);
   });
 
   socket.on('unclaim_slot', ({ roomId, slotId, userId }) => {
     const room = rooms.get(roomId);
-    if (!room) return;
+    if (!room || room.status !== 'lobby') return;
 
-    const validUserId = (userId && typeof userId === 'string' && userId.trim() !== '' && userId !== 'null' && userId !== 'undefined') ? userId : null;
+    const callerUserId = socket.data.userId;
+    const validUserId = isValidUserId(userId) ? userId : null;
+    if (!callerUserId || !validUserId || callerUserId !== validUserId) {
+      return;
+    }
+
     const slot = room.players.find(p => p.slotId === slotId);
-    if (slot && validUserId && slot.claimedBy === validUserId) {
+    if (slot && slot.claimedBy === callerUserId) {
       slot.claimedBy = null;
       slot.claimedAt = null;
-      if (room.status === 'map_building' || room.status === 'faction_ban') {
-        room.status = 'lobby';
-        room.players.sort((a, b) => a.slotId - b.slotId);
-      }
-      io.to(roomId).emit('room_state', room);
+      broadcastRoomState(room);
     }
   });
 
   // DEV TOOLBAR: Auto-fill remaining open slots with simulated players
   socket.on('dev_autofill_room', ({ roomId, currentUserId }) => {
+    if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
     const room = rooms.get(roomId);
     if (!room) return;
 
-    const validUserId = (currentUserId && typeof currentUserId === 'string' && currentUserId.trim() !== '' && currentUserId !== 'null' && currentUserId !== 'undefined')
-      ? currentUserId 
+    const validUserId = isValidUserId(currentUserId)
+      ? currentUserId
       : `user_dev_${Math.random().toString(36).substring(2, 8)}`;
 
     // Ensure validUserId has at least one claimed slot
@@ -681,11 +850,12 @@ io.on('connection', (socket) => {
       }
     }
 
-    io.to(roomId).emit('room_state', room);
+    broadcastRoomState(room);
   });
 
   // DEV TOOLBAR: Auto-submit bans for other players (bots) to advance to drafting phase immediately
   socket.on('dev_autoban_room', ({ roomId }) => {
+    if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
     const room = rooms.get(roomId);
     if (!room || room.status !== 'faction_ban') return;
 
@@ -701,11 +871,12 @@ io.on('connection', (socket) => {
       startDraftingPhase(room);
     }
 
-    io.to(roomId).emit('room_state', room);
+    broadcastRoomState(room);
   });
 
   // DEV TOOLBAR: Auto-submit random valid draft picks for remaining bots/players in the current round
   socket.on('dev_autodraft_round', ({ roomId }) => {
+    if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
     const room = rooms.get(roomId);
     if (!room || room.status !== 'drafting' || !room.draftState) return;
 
@@ -771,11 +942,12 @@ io.on('connection', (socket) => {
       advanceDraftRound(room);
     }
 
-    io.to(roomId).emit('room_state', room);
+    broadcastRoomState(room);
   });
 
   // DEV TOOLBAR: Instantly randomly distribute all remaining draft elements among participants and complete the draft
   socket.on('dev_autodraft_all', ({ roomId }) => {
+    if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
     const room = rooms.get(roomId);
     if (!room || room.status !== 'drafting' || !room.draftState) return;
 
@@ -886,7 +1058,7 @@ io.on('connection', (socket) => {
     delete room.draftState;
     startMapBuilding(room);
 
-    io.to(roomId).emit('room_state', room);
+    broadcastRoomState(room);
   });
 
   socket.on('draft_pick', ({ roomId, slotId, itemType, itemId }) => {
@@ -896,9 +1068,20 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const callerUserId = socket.data?.userId;
+    if (!isValidUserId(callerUserId)) {
+      socket.emit('room_error', { message: 'Unauthorized: valid player session required' });
+      return;
+    }
+
     const player = room.players.find(p => p.slotId === slotId);
     if (!player) {
       socket.emit('room_error', { message: 'Player slot not found' });
+      return;
+    }
+
+    if (!player.claimedBy || player.claimedBy !== callerUserId) {
+      socket.emit('room_error', { message: 'Unauthorized: you can only make draft picks for your own player slot' });
       return;
     }
 
@@ -1025,7 +1208,7 @@ io.on('connection', (socket) => {
       advanceDraftRound(room);
     }
 
-    io.to(roomId).emit('room_state', room);
+    broadcastRoomState(room);
   });
 
   socket.on('submit_faction_ban', ({ roomId, slotId, factionId }) => {
@@ -1035,9 +1218,20 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const callerUserId = socket.data?.userId;
+    if (!isValidUserId(callerUserId)) {
+      socket.emit('room_error', { message: 'Unauthorized: valid player session required' });
+      return;
+    }
+
     const player = room.players.find(p => p.slotId === slotId);
     if (!player) {
       socket.emit('room_error', { message: 'Player slot not found' });
+      return;
+    }
+
+    if (!player.claimedBy || player.claimedBy !== callerUserId) {
+      socket.emit('room_error', { message: 'Unauthorized: you can only submit a faction ban for your own player slot' });
       return;
     }
 
@@ -1059,7 +1253,7 @@ io.on('connection', (socket) => {
       startDraftingPhase(room);
     }
 
-    io.to(roomId).emit('room_state', room);
+    broadcastRoomState(room);
   });
 
   socket.on('place_tile', ({ roomId, slotId, tileId, hexId }) => {
@@ -1069,10 +1263,21 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const callerUserId = socket.data?.userId;
+    if (!isValidUserId(callerUserId)) {
+      socket.emit('room_error', { message: 'Unauthorized: valid player session required' });
+      return;
+    }
+
     const currentTurnIndex = room.mapState.currentTurnIndex || 0;
     const currentTurnPlayer = getPlayerForTurn(room.players, currentTurnIndex);
     if (!currentTurnPlayer || currentTurnPlayer.slotId !== slotId) {
       socket.emit('room_error', { message: 'It is not your turn!' });
+      return;
+    }
+
+    if (!currentTurnPlayer.claimedBy || currentTurnPlayer.claimedBy !== callerUserId) {
+      socket.emit('room_error', { message: 'Unauthorized: you can only place tiles for your own player slot' });
       return;
     }
 
@@ -1137,11 +1342,12 @@ io.on('connection', (socket) => {
       }
     }
 
-    io.to(roomId).emit('room_state', room);
+    broadcastRoomState(room);
   });
 
   // DEV TOOLBAR: Instantly complete map by placing remaining tiles
   socket.on('dev_complete_map', ({ roomId }) => {
+    if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
     const room = rooms.get(roomId);
     if (!room || room.status !== 'map_building') return;
 
@@ -1188,7 +1394,7 @@ io.on('connection', (socket) => {
       room.status = 'completed';
     }
 
-    io.to(roomId).emit('room_state', room);
+    broadcastRoomState(room);
   });
 
   // Post-Draft Faction Selection: Active player chooses 1 of their 2 drafted factions
@@ -1199,10 +1405,21 @@ io.on('connection', (socket) => {
       return;
     }
 
+    const callerUserId = socket.data?.userId;
+    if (!isValidUserId(callerUserId)) {
+      socket.emit('room_error', { message: 'Unauthorized: valid player session required' });
+      return;
+    }
+
     const currentTurnIndex = room.factionSelection?.currentTurnIndex || 0;
     const currentTurnPlayer = room.players[currentTurnIndex];
     if (!currentTurnPlayer || currentTurnPlayer.slotId !== slotId) {
       socket.emit('room_error', { message: 'It is not your turn to choose a faction!' });
+      return;
+    }
+
+    if (!currentTurnPlayer.claimedBy || currentTurnPlayer.claimedBy !== callerUserId) {
+      socket.emit('room_error', { message: 'Unauthorized: you can only select a faction for your own player slot' });
       return;
     }
 
@@ -1227,11 +1444,12 @@ io.on('connection', (socket) => {
       room.status = 'completed';
     }
 
-    io.to(roomId).emit('room_state', room);
+    broadcastRoomState(room);
   });
 
   // DEV TOOLBAR: Auto-select factions for all players and complete
   socket.on('dev_auto_select_factions', ({ roomId }) => {
+    if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
     const room = rooms.get(roomId);
     if (!room || room.status !== 'faction_selection') return;
 
@@ -1244,11 +1462,12 @@ io.on('connection', (socket) => {
 
     room.factionSelection.currentTurnIndex = room.players.length;
     room.status = 'completed';
-    io.to(roomId).emit('room_state', room);
+    broadcastRoomState(room);
   });
 
   // DEV TOOLBAR: Reset room back to lobby and clear all claims
   socket.on('dev_reset_room', ({ roomId }) => {
+    if (process.env.ENABLE_DEV_TOOLS !== 'true') return;
     const room = rooms.get(roomId);
     if (!room) return;
 
@@ -1274,7 +1493,7 @@ io.on('connection', (socket) => {
       currentTurnIndex: 0
     };
 
-    io.to(roomId).emit('room_state', room);
+    broadcastRoomState(room);
   });
 
   socket.on('disconnect', () => {

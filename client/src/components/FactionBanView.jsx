@@ -14,9 +14,33 @@ export default function FactionBanView({
   chipStyle,
   copyBtnStyle,
   headerCardStyle,
+  onBackHome,
+  actionError,
+  onClearActionError,
 }) {
-  // Current player being controlled (strictly the user's claimed slot, or active seat)
-  const activePlayer = myClaimedSlot || room.players.find(p => p.claimedBy === userId) || room.players[0];
+  // Strictly the authenticated user's claimed slot (never fall back to another player)
+  const activePlayer = myClaimedSlot || room.players.find(p => p.isMe || (Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId)) || null;
+
+  if (!activePlayer) {
+    return (
+      <div id="ban-access-restricted" style={{ maxWidth: '640px', margin: '48px auto', padding: '32px', backgroundColor: '#171724', border: '1px solid #ef4444', borderRadius: '14px', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.45)' }}>
+        <div style={{ fontSize: '36px', marginBottom: '12px' }}>🔒</div>
+        <h2 style={{ margin: '0 0 10px 0', color: '#f9fafb', fontSize: '20px' }}>Access Restricted</h2>
+        <p style={{ margin: '0 0 22px 0', color: '#9ca3af', fontSize: '14px', lineHeight: '1.5' }}>
+          This draft is private to room participants. Only players who claimed a seat before the draft started can view their faction pool and submit a ban.
+        </p>
+        {onBackHome && (
+          <button
+            onClick={onBackHome}
+            style={{ padding: '10px 22px', backgroundColor: '#2563eb', color: '#fff', border: 'none', borderRadius: '8px', cursor: 'pointer', fontSize: '14px', fontWeight: '600' }}
+          >
+            Back to Home
+          </button>
+        )}
+      </div>
+    );
+  }
+
   const hasSubmittedBan = Boolean(activePlayer?.hasBanned);
 
   const totalPlayersCount = room.players.length;
@@ -59,6 +83,33 @@ export default function FactionBanView({
           </span>
         </div>
       </div>
+
+      {actionError && (
+        <div style={{
+          marginTop: '16px',
+          backgroundColor: '#451a03',
+          border: '1px solid #f59e0b',
+          color: '#fef3c7',
+          padding: '12px 18px',
+          borderRadius: '8px',
+          fontSize: '13px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span>⚠️</span>
+            <span>{actionError}</span>
+          </div>
+          <button
+            onClick={() => onClearActionError && onClearActionError()}
+            style={{ background: 'none', border: 'none', color: '#fde68a', cursor: 'pointer', fontSize: '14px', fontWeight: 'bold' }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* Main 2-Column Layout: Left (Vertical Column of 3 Large Faction Cards) | Right (Action & Status Panel) */}
       <div
@@ -384,7 +435,7 @@ export default function FactionBanView({
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {room.players.map((p) => {
-                const isMe = Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId;
+                const isMe = Boolean(p.isMe || (userId && p.claimedBy && p.claimedBy === userId));
                 return (
                   <div
                     key={p.slotId}

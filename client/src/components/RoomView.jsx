@@ -60,7 +60,14 @@ export default function RoomView() {
 
   // Initialize socket and load room
   useEffect(() => {
-    fetch(`/api/rooms/${roomId}`)
+    setLoading(true);
+    setError(null);
+
+    fetch(`/api/rooms/${roomId}`, {
+      headers: {
+        'x-user-id': userId || '',
+      },
+    })
       .then(async (res) => {
         if (!res.ok) {
           const contentType = res.headers.get('content-type') || '';
@@ -91,10 +98,17 @@ export default function RoomView() {
 
     newSocket.on('room_state', (updatedRoom) => {
       setRoom(updatedRoom);
+      setError(null);
       setLoading(false);
     });
 
-    newSocket.on('room_error', ({ message }) => {
+    newSocket.on('room_error', ({ message, fatal }) => {
+      if (fatal) {
+        setRoom(null);
+        setError(message);
+        setLoading(false);
+        return;
+      }
       setRoom((currentRoom) => {
         if (!currentRoom) {
           setError(message);
@@ -162,9 +176,9 @@ export default function RoomView() {
     );
   }
 
-  const myClaimedSlot = room.players.find((p) => Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId);
+  const myClaimedSlot = room.players.find((p) => Boolean(p.isMe) || (Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId));
   const totalSlots = room.players.length;
-  const claimedCount = room.players.filter((p) => p.claimedBy !== null).length;
+  const claimedCount = room.players.filter((p) => p.isClaimed !== undefined ? p.isClaimed : p.claimedBy !== null).length;
   const isLobby = room.status === 'lobby';
   const isFactionBan = room.status === 'faction_ban';
   const isDrafting = room.status === 'drafting';
@@ -289,6 +303,9 @@ export default function RoomView() {
           chipStyle={chipStyle}
           copyBtnStyle={copyBtnStyle}
           headerCardStyle={headerCardStyle}
+          onBackHome={() => navigate('/')}
+          actionError={actionError}
+          onClearActionError={() => setActionError(null)}
         />
       ) : isDrafting ? (
         <DraftingPhaseView
@@ -302,6 +319,9 @@ export default function RoomView() {
           chipStyle={chipStyle}
           copyBtnStyle={copyBtnStyle}
           headerCardStyle={headerCardStyle}
+          onBackHome={() => navigate('/')}
+          actionError={actionError}
+          onClearActionError={() => setActionError(null)}
         />
       ) : isLobby ? (
         /* LOBBY VIEW */
@@ -358,9 +378,10 @@ export default function RoomView() {
               margin: '0 auto',
             }}>
               {room.players.map((slot) => {
-                const isClaimedByMe = Boolean(userId) && Boolean(slot.claimedBy) && slot.claimedBy === userId;
-                const isClaimedByOther = slot.claimedBy && slot.claimedBy !== userId;
-                const isFree = !slot.claimedBy;
+                const isClaimedByMe = Boolean(slot.isMe) || (Boolean(userId) && Boolean(slot.claimedBy) && slot.claimedBy === userId);
+                const isSlotClaimed = slot.isClaimed !== undefined ? slot.isClaimed : Boolean(slot.claimedBy);
+                const isClaimedByOther = isSlotClaimed && !isClaimedByMe;
+                const isFree = !isSlotClaimed;
 
                 return (
                   <div
@@ -947,7 +968,7 @@ export default function RoomView() {
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {room.players.map((p, playerIdx) => {
-                    const isMe = Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId;
+                    const isMe = Boolean(p.isMe) || (Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId);
                     const initialBlue = totalSlots === 3 ? 6 : 3;
                     const blueCount = p.remainingBlue ?? p.hand?.blue?.length ?? initialBlue;
                     const redCount = p.remainingRed ?? p.hand?.red?.length ?? 2;

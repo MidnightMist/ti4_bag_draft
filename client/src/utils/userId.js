@@ -21,7 +21,15 @@ export function getOrCreateUserId() {
   const STORAGE_KEY = 'ti4_user_id';
   let userId = localStorage.getItem(STORAGE_KEY);
   if (!userId) {
-    userId = 'user_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      userId = 'user_' + crypto.randomUUID();
+    } else if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+      const bytes = new Uint8Array(16);
+      crypto.getRandomValues(bytes);
+      userId = 'user_' + Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+    } else {
+      userId = 'user_' + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
+    }
     localStorage.setItem(STORAGE_KEY, userId);
   }
   return userId;
