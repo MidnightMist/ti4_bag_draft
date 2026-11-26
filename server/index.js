@@ -490,6 +490,7 @@ function sanitizeRoomForUser(room, viewerUserId) {
       name: p.name,
       isClaimed: Boolean(p.claimedBy),
       isMe,
+      isSlotHost: Boolean(room.createdBy && p.claimedBy && p.claimedBy === room.createdBy),
       claimedAt: p.claimedAt || null,
       isSpeaker: Boolean(p.isSpeaker),
     };
@@ -536,6 +537,8 @@ function sanitizeRoomForUser(room, viewerUserId) {
     id: room.id,
     createdAt: room.createdAt,
     status: room.status,
+    hasHost: Boolean(room.createdBy),
+    isHost: Boolean(room.createdBy && viewerUserId && room.createdBy === viewerUserId),
     settings: room.settings,
     players: sanitizedPlayers,
     mapState: room.mapState,
@@ -575,6 +578,8 @@ function broadcastRoomState(room) {
   const roomSockets = io.sockets.adapter.rooms.get(room.id);
   if (!roomSockets) return;
 
+  const hasUnclaimedSlots = room.players.some(p => !p.claimedBy);
+
   for (const socketId of roomSockets) {
     const clientSocket = io.sockets.sockets.get(socketId);
     if (!clientSocket) continue;
@@ -582,7 +587,7 @@ function broadcastRoomState(room) {
     const viewerUserId = clientSocket.data?.userId || null;
     const viewerSlot = findViewerSlot(room, viewerUserId);
 
-    if (isSecretDraftPhase(room.status) && !viewerSlot) {
+    if (isSecretDraftPhase(room.status) && !viewerSlot && !hasUnclaimedSlots) {
       clientSocket.emit('room_error', {
         message: 'Access denied: this draft is private to room participants.',
         fatal: true,
@@ -634,12 +639,19 @@ app.post('/api/rooms', (req, res) => {
       }
     }
 
+    const headerUserId = req.headers['x-user-id'];
+    const bodyUserId = req.body?.creatorUserId;
+    const creatorUserId = isValidUserId(headerUserId)
+      ? headerUserId
+      : (isValidUserId(bodyUserId) ? bodyUserId : null);
+
     const roomId = generateRoomId();
     const initialPlacedTiles = count === 8 ? { ...EIGHT_PLAYER_HYPERLANES } : count === 7 ? { ...SEVEN_PLAYER_HYPERLANES } : count === 5 ? { ...FIVE_PLAYER_HYPERLANES } : count === 4 ? { ...FOUR_PLAYER_HYPERLANES } : {};
 
     const roomData = {
       id: roomId,
       createdAt: Date.now(),
+      createdBy: creatorUserId,
       status: 'lobby', // 'lobby' | 'map_building' | 'completed'
       settings: {
         gameMode,
@@ -659,7 +671,7 @@ app.post('/api/rooms', (req, res) => {
 
     setRoom(roomId, roomData);
     console.log(`[Room Created] Room ID: ${roomId}, Players: ${count}, Mode: ${tileMode}`);
-    res.json({ success: true, roomId, room: sanitizeRoomForUser(roomData, null) });
+    res.json({ success: true, roomId, room: sanitizeRoomForUser(roomData, creatorUserId) });
   } catch (err) {
     console.error('[Error creating room]:', err);
     res.status(500).json({ error: err.message || 'Internal server error while creating room' });
@@ -677,8 +689,9 @@ app.get('/api/rooms/:id', (req, res) => {
     const queryUserId = typeof req.query.userId === 'string' ? req.query.userId : null;
     const viewerUserId = isValidUserId(headerUserId) ? headerUserId : (isValidUserId(queryUserId) ? queryUserId : null);
     const viewerSlot = findViewerSlot(room, viewerUserId);
+    const hasUnclaimedSlots = room.players.some(p => !p.claimedBy);
 
-    if (isSecretDraftPhase(room.status) && !viewerSlot) {
+    if (isSecretDraftPhase(room.status) && !viewerSlot && !hasUnclaimedSlots) {
       return res.status(403).json({
         error: 'Access denied: this draft is already in progress and only participants who claimed a slot may enter.'
       });
@@ -711,7 +724,8 @@ io.on('connection', (socket) => {
     }
 
     const viewerSlot = findViewerSlot(room, userId);
-    if (isSecretDraftPhase(room.status) && !viewerSlot) {
+    const hasUnclaimedSlots = room.players.some(p => !p.claimedBy);
+    if (isSecretDraftPhase(room.status) && !viewerSlot && !hasUnclaimedSlots) {
       socket.emit('room_error', {
         message: 'Access denied: this draft is already in progress and only participants who claimed a slot may enter.',
         fatal: true,
@@ -734,8 +748,8 @@ io.on('connection', (socket) => {
       return;
     }
 
-    if (room.status !== 'lobby') {
-      socket.emit('room_error', { message: 'Slots can only be claimed in the lobby' });
+    if (room.status === 'completed') {
+      socket.emit('room_error', { message: 'Slots cannot be claimed after the room is completed' });
       return;
     }
 
@@ -753,18 +767,30 @@ io.on('connection', (socket) => {
     socket.data.userId = validUserId;
     socket.data.roomId = roomId;
 
-    // Release any other slot claimed by validUserId
-    room.players.forEach(p => {
-      if (p.claimedBy === validUserId && p.slotId !== slotId) {
-        p.claimedBy = null;
-        p.claimedAt = null;
-      }
-    });
-
-    const targetSlot = room.players.find(p => p.slotId === slotId);
+    const numericSlotId = Number(slotId);
+    const targetSlot = room.players.find(p => p.slotId === numericSlotId);
     if (!targetSlot) {
       socket.emit('room_error', { message: 'Slot not found' });
       return;
+    }
+
+    if (room.status === 'lobby') {
+      // In lobby, a player can switch seats by releasing their previously claimed slot
+      room.players.forEach(p => {
+        if (p.claimedBy === validUserId && p.slotId !== numericSlotId) {
+          p.claimedBy = null;
+          p.claimedAt = null;
+        }
+      });
+    } else {
+      // During active draft/map building, an active participant cannot switch into another player's unclaimed seat
+      const existingSlot = findViewerSlot(room, validUserId);
+      if (existingSlot && existingSlot.slotId !== numericSlotId) {
+        socket.emit('room_error', {
+          message: 'You already hold a seat in this room and cannot claim another seat during an active game.'
+        });
+        return;
+      }
     }
 
     if (targetSlot.claimedBy && targetSlot.claimedBy !== validUserId) {
@@ -772,11 +798,11 @@ io.on('connection', (socket) => {
       return;
     }
 
-    // Claim slot
+    // Claim slot (preserving existing game/draft state on the slot)
     targetSlot.claimedBy = validUserId;
     targetSlot.claimedAt = Date.now();
 
-    // Check if all players are claimed
+    // Check if all players are claimed (only transitions out of lobby)
     const allClaimed = room.players.every(p => p.claimedBy !== null);
     if (allClaimed && room.status === 'lobby') {
       if (room.settings.gameMode === 'draft') {
@@ -799,12 +825,86 @@ io.on('connection', (socket) => {
       return;
     }
 
-    const slot = room.players.find(p => p.slotId === slotId);
+    const numericSlotId = Number(slotId);
+    const slot = room.players.find(p => p.slotId === numericSlotId);
     if (slot && slot.claimedBy === callerUserId) {
       slot.claimedBy = null;
       slot.claimedAt = null;
       broadcastRoomState(room);
     }
+  });
+
+  // One-time host claim for legacy rooms created before host tracking existed
+  socket.on('claim_host', ({ roomId }) => {
+    const room = getRoom(roomId);
+    if (!room) {
+      socket.emit('room_error', { message: 'Room not found' });
+      return;
+    }
+
+    const callerUserId = socket.data?.userId;
+    if (!isValidUserId(callerUserId)) {
+      socket.emit('room_error', { message: 'Unauthorized: valid player session required' });
+      return;
+    }
+
+    if (room.createdBy) {
+      if (room.createdBy === callerUserId) {
+        socket.emit('room_state', sanitizeRoomForUser(room, callerUserId));
+        return;
+      }
+      socket.emit('room_error', { message: 'A host is already assigned for this room.' });
+      return;
+    }
+
+    if (isSecretDraftPhase(room.status) && !findViewerSlot(room, callerUserId)) {
+      socket.emit('room_error', { message: 'Unauthorized: only room participants can claim host controls during a private draft.' });
+      return;
+    }
+
+    room.createdBy = callerUserId;
+    broadcastRoomState(room);
+  });
+
+  // Host-only unclaim: allows the room author to release a player's slot in any active phase
+  socket.on('host_unclaim_slot', ({ roomId, slotId }) => {
+    const room = getRoom(roomId);
+    if (!room) {
+      socket.emit('room_error', { message: 'Room not found' });
+      return;
+    }
+
+    if (room.status === 'completed') {
+      socket.emit('room_error', { message: 'Cannot unclaim slots in a completed room.' });
+      return;
+    }
+
+    const callerUserId = socket.data?.userId;
+    if (!isValidUserId(callerUserId)) {
+      socket.emit('room_error', { message: 'Unauthorized: valid player session required' });
+      return;
+    }
+
+    if (!room.createdBy || room.createdBy !== callerUserId) {
+      socket.emit('room_error', { message: 'Unauthorized: only the room host can unclaim player slots.' });
+      return;
+    }
+
+    const numericSlotId = Number(slotId);
+    const slot = room.players.find(p => p.slotId === numericSlotId);
+    if (!slot) {
+      socket.emit('room_error', { message: 'Player slot not found' });
+      return;
+    }
+
+    if (!slot.claimedBy) {
+      return;
+    }
+
+    // Clear only session ownership so the player can rejoin from a new browser without losing draft/map state
+    slot.claimedBy = null;
+    slot.claimedAt = null;
+    broadcastRoomState(room);
   });
 
   // DEV TOOLBAR: Auto-fill remaining open slots with simulated players

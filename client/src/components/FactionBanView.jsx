@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { FACTIONS } from '../data/factionsData.js';
+import ReclaimSeatView from './ReclaimSeatView.jsx';
 
 export default function FactionBanView({
   room,
@@ -17,11 +18,30 @@ export default function FactionBanView({
   onBackHome,
   actionError,
   onClearActionError,
+  onHostUnclaim,
+  onClaimHost,
+  onClaimSlot,
 }) {
+  const [confirmingUnclaimSlotId, setConfirmingUnclaimSlotId] = useState(null);
+
   // Strictly the authenticated user's claimed slot (never fall back to another player)
   const activePlayer = myClaimedSlot || room.players.find(p => p.isMe || (Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId)) || null;
 
   if (!activePlayer) {
+    const hasUnclaimedSlots = room.players.some(p => !p.isClaimed);
+    if (hasUnclaimedSlots) {
+      return (
+        <ReclaimSeatView
+          room={room}
+          phaseLabel="Faction Banning"
+          onClaimSlot={onClaimSlot}
+          actionError={actionError}
+          onClearActionError={onClearActionError}
+          onBackHome={onBackHome}
+        />
+      );
+    }
+
     return (
       <div id="ban-access-restricted" style={{ maxWidth: '640px', margin: '48px auto', padding: '32px', backgroundColor: '#171724', border: '1px solid #ef4444', borderRadius: '14px', textAlign: 'center', boxShadow: '0 8px 32px rgba(0,0,0,0.45)' }}>
         <div style={{ fontSize: '36px', marginBottom: '12px' }}>🔒</div>
@@ -424,18 +444,61 @@ export default function FactionBanView({
               boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
             }}
           >
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-              <h4 style={{ margin: 0, fontSize: '14px', color: '#f3f4f6', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-                Players Status
-              </h4>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h4 style={{ margin: 0, fontSize: '14px', color: '#f3f4f6', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  Players Status
+                </h4>
+                {room.isHost && (
+                  <span style={{ fontSize: '10px', backgroundColor: '#78350f', color: '#fde68a', border: '1px solid #f59e0b', padding: '1px 6px', borderRadius: '4px', fontWeight: '700' }}>
+                    👑 Host
+                  </span>
+                )}
+              </div>
               <span style={{ fontSize: '12px', color: '#9ca3af' }}>
                 {bannedCount}/{totalPlayersCount} ready
               </span>
             </div>
 
+            {!room.hasHost && onClaimHost && (
+              <div style={{
+                marginBottom: '12px',
+                padding: '10px 12px',
+                backgroundColor: '#1e1b2e',
+                border: '1px solid #4c1d95',
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}>
+                <span style={{ fontSize: '11px', color: '#ddd6fe', lineHeight: '1.35' }}>
+                  No room host is assigned yet. If you created this room, claim host controls to unclaim disconnected players.
+                </span>
+                <button
+                  id="claim-host-btn"
+                  onClick={onClaimHost}
+                  style={{
+                    padding: '6px 10px',
+                    backgroundColor: '#7c3aed',
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                  }}
+                >
+                  👑 Claim Host Controls
+                </button>
+              </div>
+            )}
+
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               {room.players.map((p) => {
                 const isMe = Boolean(p.isMe || (userId && p.claimedBy && p.claimedBy === userId));
+                const isClaimed = p.isClaimed !== undefined ? Boolean(p.isClaimed) : Boolean(p.claimedBy);
+                const isConfirming = confirmingUnclaimSlotId === p.slotId;
+
                 return (
                   <div
                     key={p.slotId}
@@ -445,11 +508,12 @@ export default function FactionBanView({
                       alignItems: 'center',
                       padding: '8px 12px',
                       backgroundColor: isMe ? '#1e293b' : '#111827',
-                      border: `1px solid ${isMe ? '#3b82f6' : '#272738'}`,
+                      border: `1px solid ${!isClaimed ? '#f59e0b' : isMe ? '#3b82f6' : '#272738'}`,
                       borderRadius: '6px',
+                      gap: '8px',
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: '13px', fontWeight: isMe ? 'bold' : 'normal', color: isMe ? '#93c5fd' : '#e5e7eb' }}>
                         {p.name}
                       </span>
@@ -458,9 +522,14 @@ export default function FactionBanView({
                           YOU
                         </span>
                       )}
+                      {!isClaimed && (
+                        <span style={{ fontSize: '10px', backgroundColor: '#78350f', color: '#fde68a', padding: '1px 5px', borderRadius: '3px', fontWeight: 'bold' }}>
+                          Open
+                        </span>
+                      )}
                     </div>
 
-                    <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
                       {p.hasBanned ? (
                         <span style={{ color: '#34d399', fontSize: '12px', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <span>✓</span> Ready
@@ -469,6 +538,65 @@ export default function FactionBanView({
                         <span style={{ color: '#fbbf24', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                           <span>⏳</span> Deciding...
                         </span>
+                      )}
+
+                      {room.isHost && isClaimed && !isMe && onHostUnclaim && (
+                        isConfirming ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                            <button
+                              id={`confirm-host-unclaim-${p.slotId}`}
+                              onClick={() => {
+                                onHostUnclaim(p.slotId);
+                                setConfirmingUnclaimSlotId(null);
+                              }}
+                              style={{
+                                padding: '2px 7px',
+                                backgroundColor: '#dc2626',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Confirm?
+                            </button>
+                            <button
+                              onClick={() => setConfirmingUnclaimSlotId(null)}
+                              style={{
+                                padding: '2px 5px',
+                                backgroundColor: '#374151',
+                                color: '#d1d5db',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '11px',
+                                cursor: 'pointer',
+                              }}
+                              title="Cancel"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            id={`host-unclaim-btn-${p.slotId}`}
+                            onClick={() => setConfirmingUnclaimSlotId(p.slotId)}
+                            style={{
+                              padding: '2px 7px',
+                              backgroundColor: '#3f1d28',
+                              color: '#fda4af',
+                              border: '1px solid #9f1239',
+                              borderRadius: '4px',
+                              fontSize: '11px',
+                              fontWeight: '600',
+                              cursor: 'pointer',
+                            }}
+                            title={`Release ${p.name}'s seat so they can rejoin from another browser`}
+                          >
+                            Unclaim
+                          </button>
+                        )
                       )}
                     </div>
                   </div>

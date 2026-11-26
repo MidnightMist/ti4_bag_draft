@@ -34,10 +34,12 @@ export default function RoomView() {
   const [hoveredFactionId, setHoveredFactionId] = useState(null);
   const [selectedFactionModal, setSelectedFactionModal] = useState(null);
   const [pendingSelectedFactionId, setPendingSelectedFactionId] = useState(null);
+  const [confirmingUnclaimSlotId, setConfirmingUnclaimSlotId] = useState(null);
 
   // Clear draft previews whenever turn advances or room status transitions
   useEffect(() => {
     setSlotDrafts({});
+    setConfirmingUnclaimSlotId(null);
   }, [room?.mapState?.currentTurnIndex, room?.status]);
 
   useEffect(() => {
@@ -134,6 +136,18 @@ export default function RoomView() {
   const handleUnclaim = (slotId) => {
     if (!socket) return;
     socket.emit('unclaim_slot', { roomId, slotId, userId });
+  };
+
+  const handleHostUnclaim = (slotId) => {
+    if (!socket) return;
+    setActionError(null);
+    socket.emit('host_unclaim_slot', { roomId, slotId });
+  };
+
+  const handleClaimHost = () => {
+    if (!socket) return;
+    setActionError(null);
+    socket.emit('claim_host', { roomId });
   };
 
   const copyRoomUrl = () => {
@@ -306,6 +320,9 @@ export default function RoomView() {
           onBackHome={() => navigate('/')}
           actionError={actionError}
           onClearActionError={() => setActionError(null)}
+          onHostUnclaim={handleHostUnclaim}
+          onClaimHost={handleClaimHost}
+          onClaimSlot={handleClaim}
         />
       ) : isDrafting ? (
         <DraftingPhaseView
@@ -322,6 +339,9 @@ export default function RoomView() {
           onBackHome={() => navigate('/')}
           actionError={actionError}
           onClearActionError={() => setActionError(null)}
+          onHostUnclaim={handleHostUnclaim}
+          onClaimHost={handleClaimHost}
+          onClaimSlot={handleClaim}
         />
       ) : isLobby ? (
         /* LOBBY VIEW */
@@ -347,7 +367,7 @@ export default function RoomView() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '8px', marginTop: '16px', flexWrap: 'wrap', alignItems: 'center' }}>
               <span style={chipStyle}>👥 Players: {totalSlots}</span>
               <span style={chipStyle}>
                 {room.settings.tileMode === 'balanced' ? '⚖️ Balanced Tiles' : '🎲 Random Tiles'}
@@ -357,6 +377,29 @@ export default function RoomView() {
               <span style={{ ...chipStyle, backgroundColor: '#374151', color: '#f3f4f6' }}>
                 {`⏳ Waiting for Claims (${claimedCount}/${totalSlots})`}
               </span>
+              {room.isHost && (
+                <span style={{ ...chipStyle, backgroundColor: '#78350f', color: '#fde68a', border: '1px solid #f59e0b', fontWeight: '700' }}>
+                  👑 You are Room Host
+                </span>
+              )}
+              {!room.hasHost && (
+                <button
+                  id="claim-host-btn"
+                  onClick={handleClaimHost}
+                  style={{
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                    backgroundColor: '#7c3aed',
+                    color: '#fff',
+                    border: 'none',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    cursor: 'pointer',
+                  }}
+                >
+                  👑 Claim Host Controls
+                </button>
+              )}
             </div>
           </div>
 
@@ -443,6 +486,35 @@ export default function RoomView() {
                         >
                           Claim this slot
                         </button>
+                      ) : room.isHost ? (
+                        confirmingUnclaimSlotId === slot.slotId ? (
+                          <div style={{ display: 'flex', gap: '8px' }}>
+                            <button
+                              id={`confirm-host-unclaim-${slot.slotId}`}
+                              onClick={() => {
+                                handleHostUnclaim(slot.slotId);
+                                setConfirmingUnclaimSlotId(null);
+                              }}
+                              style={{ ...unclaimBtnStyle, flex: 1, backgroundColor: '#dc2626', color: '#fff', border: 'none', fontWeight: '700' }}
+                            >
+                              Confirm Unclaim?
+                            </button>
+                            <button
+                              onClick={() => setConfirmingUnclaimSlotId(null)}
+                              style={{ padding: '10px 12px', backgroundColor: '#374151', color: '#d1d5db', border: 'none', borderRadius: '6px', cursor: 'pointer', fontSize: '13px' }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            id={`host-unclaim-btn-${slot.slotId}`}
+                            onClick={() => setConfirmingUnclaimSlotId(slot.slotId)}
+                            style={unclaimBtnStyle}
+                          >
+                            Unclaim (Host)
+                          </button>
+                        )
                       ) : (
                         <button
                           disabled
@@ -598,7 +670,27 @@ export default function RoomView() {
                   </span>
                   {room.settings.expansions.pok && <span style={miniChipStyle}>📦 PoK</span>}
                   {room.settings.expansions.thundersEdge && <span style={miniChipStyle}>⚡ Thunder's Edge</span>}
+                  {room.isHost && (
+                    <span style={{ ...miniChipStyle, backgroundColor: '#78350f', color: '#fde68a', border: '1px solid #f59e0b', fontWeight: '700' }}>
+                      👑 Host
+                    </span>
+                  )}
                 </div>
+
+                {!room.hasHost && (
+                  <div style={{ marginTop: '10px', padding: '8px 10px', backgroundColor: '#1e1b2e', border: '1px solid #4c1d95', borderRadius: '8px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <span style={{ fontSize: '11px', color: '#ddd6fe', lineHeight: '1.3' }}>
+                      No host assigned. Room creator can claim host controls to unclaim disconnected players.
+                    </span>
+                    <button
+                      id="claim-host-btn"
+                      onClick={handleClaimHost}
+                      style={{ padding: '6px 10px', backgroundColor: '#7c3aed', color: '#fff', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '700', cursor: 'pointer' }}
+                    >
+                      👑 Claim Host Controls
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -969,6 +1061,8 @@ export default function RoomView() {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                   {room.players.map((p, playerIdx) => {
                     const isMe = Boolean(p.isMe) || (Boolean(userId) && Boolean(p.claimedBy) && p.claimedBy === userId);
+                    const isClaimed = p.isClaimed !== undefined ? Boolean(p.isClaimed) : Boolean(p.claimedBy);
+                    const isConfirming = confirmingUnclaimSlotId === p.slotId;
                     const initialBlue = totalSlots === 3 ? 6 : 3;
                     const blueCount = p.remainingBlue ?? p.hand?.blue?.length ?? initialBlue;
                     const redCount = p.remainingRed ?? p.hand?.red?.length ?? 2;
@@ -983,7 +1077,7 @@ export default function RoomView() {
                         onClick={() => setSelectedPerspectiveSeat(targetSeat)}
                         style={{
                           backgroundColor: isMe ? '#1e293b' : isOriented ? '#162032' : '#11111b',
-                          border: `1px solid ${isMe ? '#3b82f6' : isOriented ? '#10b981' : '#272738'}`,
+                          border: `1px solid ${!isClaimed ? '#f59e0b' : isMe ? '#3b82f6' : isOriented ? '#10b981' : '#272738'}`,
                           borderRadius: '8px',
                           padding: '8px 10px',
                           display: 'flex',
@@ -991,10 +1085,11 @@ export default function RoomView() {
                           alignItems: 'center',
                           cursor: 'pointer',
                           transition: 'all 0.15s ease',
+                          gap: '6px',
                         }}
                         title={`Click to view board from ${p.name}'s seat`}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0, flexWrap: 'wrap' }}>
                           {p.isSpeaker && <span title="Speaker token">👑</span>}
                           <span style={{ fontSize: '13px', fontWeight: isMe ? '700' : '500', color: isMe ? '#93c5fd' : '#e5e7eb' }}>
                             {p.name}
@@ -1004,6 +1099,11 @@ export default function RoomView() {
                               YOU
                             </span>
                           )}
+                          {!isClaimed && (
+                            <span style={{ fontSize: '9px', backgroundColor: '#78350f', padding: '1px 5px', borderRadius: '4px', color: '#fde68a', fontWeight: 'bold' }}>
+                              Open
+                            </span>
+                          )}
                           {isOriented && !isMe && (
                             <span style={{ fontSize: '9px', backgroundColor: '#064e3b', padding: '1px 5px', borderRadius: '4px', color: '#34d399', fontWeight: 'bold' }}>
                               VIEWING
@@ -1011,7 +1111,7 @@ export default function RoomView() {
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexShrink: 0 }}>
                           <span title={`${blueCount} Blue tiles in hand`} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '11px', fontWeight: '700', color: '#93c5fd' }}>
                             <svg width="14" height="14" viewBox="-10 -10 20 20">
                               <polygon points="-8,0 -4,-7 4,-7 8,0 4,7 -4,7" fill="#1d4ed8" stroke="#60a5fa" strokeWidth="1" />
@@ -1024,6 +1124,90 @@ export default function RoomView() {
                             </svg>
                             {redCount}
                           </span>
+
+                          {!isClaimed && !myClaimedSlot && (
+                            <button
+                              id={`seating-claim-btn-${p.slotId}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleClaim(p.slotId);
+                              }}
+                              style={{
+                                padding: '2px 7px',
+                                backgroundColor: '#059669',
+                                color: '#fff',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '10px',
+                                fontWeight: '700',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              Claim
+                            </button>
+                          )}
+
+                          {room.isHost && isClaimed && !isMe && (
+                            isConfirming ? (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }} onClick={(e) => e.stopPropagation()}>
+                                <button
+                                  id={`confirm-host-unclaim-${p.slotId}`}
+                                  onClick={() => {
+                                    handleHostUnclaim(p.slotId);
+                                    setConfirmingUnclaimSlotId(null);
+                                  }}
+                                  style={{
+                                    padding: '2px 6px',
+                                    backgroundColor: '#dc2626',
+                                    color: '#fff',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    fontWeight: '700',
+                                    cursor: 'pointer',
+                                  }}
+                                >
+                                  Confirm?
+                                </button>
+                                <button
+                                  onClick={() => setConfirmingUnclaimSlotId(null)}
+                                  style={{
+                                    padding: '2px 5px',
+                                    backgroundColor: '#374151',
+                                    color: '#d1d5db',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    fontSize: '10px',
+                                    cursor: 'pointer',
+                                  }}
+                                  title="Cancel"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                id={`host-unclaim-btn-${p.slotId}`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfirmingUnclaimSlotId(p.slotId);
+                                }}
+                                style={{
+                                  padding: '2px 6px',
+                                  backgroundColor: '#3f1d28',
+                                  color: '#fda4af',
+                                  border: '1px solid #9f1239',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: '600',
+                                  cursor: 'pointer',
+                                }}
+                                title={`Release ${p.name}'s seat so they can rejoin from another browser`}
+                              >
+                                Unclaim
+                              </button>
+                            )
+                          )}
                         </div>
                       </div>
                     );
@@ -1076,6 +1260,59 @@ export default function RoomView() {
               alignItems: 'center',
             }}
           >
+            {/* Reclaim Open Seat Banner (when an unclaimed player opens map_building or faction_selection) */}
+            {!isCompleted && !myClaimedSlot && room.players.some(p => !p.isClaimed) && (
+              <div
+                id="reclaim-open-seat-banner"
+                style={{
+                  marginBottom: '14px',
+                  width: '100%',
+                  maxWidth: totalSlots === 7 ? '840px' : '920px',
+                  backgroundColor: '#111c2d',
+                  border: '2px solid #10b981',
+                  borderRadius: '12px',
+                  padding: '14px 18px',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '12px',
+                  boxShadow: '0 4px 18px rgba(16, 185, 129, 0.25)',
+                }}
+              >
+                <div>
+                  <div style={{ fontSize: '14px', fontWeight: '800', color: '#34d399' }}>
+                    Open Seat Available — Reclaim Your Player Slot
+                  </div>
+                  <div style={{ fontSize: '12px', color: '#d1d5db', marginTop: '3px' }}>
+                    Select your seat below to reconnect and resume your hand and actions:
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {room.players.filter(p => !p.isClaimed).map(slot => (
+                    <button
+                      key={slot.slotId}
+                      id={`banner-reclaim-btn-${slot.slotId}`}
+                      onClick={() => handleClaim(slot.slotId)}
+                      style={{
+                        padding: '8px 14px',
+                        backgroundColor: '#059669',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '13px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px rgba(5, 150, 105, 0.4)',
+                      }}
+                    >
+                      Claim Seat: {slot.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Placement Error Notification Banner (Draft mode) */}
             {actionError && !isCompleted && (
               <div

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getDefaultTiersForExpansions } from '../data/blueTiles.js';
 import { validateBlueTiers } from '../data/tierValidator.js';
 import TierConfigEditor from './TierConfigEditor.jsx';
+import { getOrCreateUserId } from '../utils/userId.js';
 
 export default function CreateRoom({ onCancel }) {
   const navigate = useNavigate();
@@ -102,7 +103,10 @@ export default function CreateRoom({ onCancel }) {
 
       const res = await fetch('/api/rooms', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'x-user-id': getOrCreateUserId(),
+        },
         body: JSON.stringify(payload),
       });
 

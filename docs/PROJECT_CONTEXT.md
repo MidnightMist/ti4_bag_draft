@@ -36,10 +36,11 @@
 
 ### Phase 2: Lobby & Claim System (`RoomView.jsx`, `/room/:roomId`)
 - **Unique Shareable URL:** `/room/:roomId` with one-click "Copy Link for Players".
-- **Slot Claiming:**
+- **Slot Claiming & Host Seat Recovery:**
   - Each player opens the URL and claims their slot.
   - Once claimed, the slot is locked to that user's ID and highlighted in blue. Other players see it as "Claimed".
-  - A player can unclaim/release their slot if needed.
+  - A player can unclaim/release their slot in the lobby if needed.
+  - **Host Unclaim & Mid-Game Reclaim:** Room creators (`createdBy`) are tracked automatically on room creation. For legacy rooms created before host tracking existed (`createdBy: null`), a one-time **"Claim Host Controls"** button (`claim_host`) allows assigning the host. The room host can unclaim any claimed player slot (`host_unclaim_slot`) across `lobby`, `faction_ban`, `drafting`, `map_building`, and `faction_selection` without resetting that slot's draft/map progress. When an unclaimed slot exists during an active phase (including private `faction_ban` and `drafting` phases), opening the room link displays a **Rejoin Room — Claim Your Open Seat** UI (with all secret draft data stripped until claimed) so the player can reclaim their seat from a new browser. Active participants who already hold a seat cannot switch seats mid-game.
 - **Transition Trigger (Galaxy Builder):**
   - When all `N` players claim their slots, the room state transitions from `"lobby"` to active map creation (`map_building`).
 - **Transition Trigger (Bag Draft):**

@@ -58,6 +58,7 @@ export function normalizeRoomData(raw) {
     schemaVersion: raw.schemaVersion || CURRENT_SCHEMA_VERSION,
     createdAt: typeof raw.createdAt === 'number' ? raw.createdAt : Date.now(),
     updatedAt: typeof raw.updatedAt === 'number' ? raw.updatedAt : Date.now(),
+    createdBy: typeof raw.createdBy === 'string' && raw.createdBy.trim() ? raw.createdBy : null,
     status: raw.status || 'lobby',
     settings: {
       gameMode: settings.gameMode || 'map',
